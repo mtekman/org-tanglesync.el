@@ -1,29 +1,27 @@
-;;; org-treescope.el --- Time scoping sparse trees within org -*- lexical-binding: t; -*-
+;;; org-tanglesync.el --- Pulling external changes from tangled blocks -*- lexical-binding: t; -*-
 
 ;; Copright (C) 2019 Mehmet Tekman <mtekman89@gmail.com>
 
 ;; Author: Mehmet Tekman
-;; URL: https://github.com/mtekman/org-treescope.el
+;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
-;; Package-Requires: ((org "9.2.3"))
+;; Package-Requires: ((org "9.2.3") (diff "?.?")
 ;; Version: 0.1
 
 ;;; Commentary:
 
-;; Navigating through an org file to see what needs to be done
-;; this week and what was completed last month can be tricky.
-;; This tool provides a time window to analyse your org file.
+;; Pulling external file changes to a tangled org-babel src block
+;; is surprisingly not implemented. This addresses that.
 
 ;;; Code:
 (require 'org)
 (require 'diff)
 
 (deftype actions-on-diff ()
-  '(:external  ;; always overwrites with external
-    :prompt    ;; prompts the user to overwrite
-    :ediff     ;; performs an ediff between two buffers
-    :custom    ;; performs a user action between buffers
-    ))
+  '((:external . "external")  ;; always overwrites with external
+    (:prompt . "prompt")      ;; prompts the user to overwrite
+    (:diff . "diff")          ;; performs a diff between two buffers
+    (:custom . "custom")))    ;; performs a user action between buffers
 
 (defcustom diff-action :prompt
   "Which default action to perform when a diff is detected between
@@ -32,7 +30,7 @@
 
 (defcustom custom-diff-action nil
   "A user passed function for action on the internal and external
-   buffer. Only takes effect when :custom is set") 
+   buffer. Only takes effect when :custom is set")
 
 
 (defun get-blockbody-buffer (block-info)
@@ -118,20 +116,48 @@
     (cond
      ((eq action-block :prompt) (setq method-final 'perform-userask-overwrite))
      ((eq action-block :external (setq method-final 'perform-overwrite)))
-     ((eq action-block :ediff (setq method-final 'perform-ediff)))
+     ((eq action-block :diff (setq method-final 'perform-diff)))
      ((eq action-block :custom (setq method-final 'perform-custom))))
-    (method-final internal external)))
+    (progn (method-final internal external)
+           (kill-buffer internal)
+           (kill-buffer external))))
+
+
+;; (defun perform-magit (internal external)
+;;   "It is pointless to call this on every block.
+;;    Let the user do it at the end.")
+
+(defun perform-custom (internal external)
+  "Calls the custom user function if not nil"
+  (unless custom-diff-action
+    (custom-diff-action internal external)))
+
+
+(defun perform-diff (internal external)
+  "Literally calls diff"
+  (diff internal external))
 
 (defun perform-overwrite (internal external)
-  "Overwrites the current code block")
+  "Overwrites the current code block"
+  (with-current-buffer
+      (let ((cut-beg nil) (cut-end nil))
+        (progn (org-babel-goto-src-block-head)
+               (search-forward "\n")
+               (setq cut-beg (point))
+               (search-forward-regexp org-babel-src-name-regexp)
+               (goto-char (- (line-beginning-position) 1))
+               (setq cut-end (point))
+               ;; cut out the old text
+               (delete-region cut-beg cut-end)
+               ;; insert the new text
+               (goto-char cut-beg)
+               (insert-buffer external)))))
 
 (defun perform-userask-overwrite (internal external)
   "Asks user to overwrite, otherwise skips"
   (when (y-or-n-p "Block has changed externally. Pull changes? ")
-      (org- external)))
+    (perform-overwrite internal external)))
 
-
-  
 
 (defun action-on-src-edit ()
   "This hooks into the org-babel-edit-src hook")
