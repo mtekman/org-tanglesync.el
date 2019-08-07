@@ -50,8 +50,7 @@
 (defun get-diffaction (block-info)
   "Extract the diff action if present on the block
    otherwise use the default `diff-action`"
-  (let* ((action (get-header-property :diff block-info)))
-    action))
+  (get-header-property :diff block-info))
 
 (defun get-tangledfile (block-info)
   "Extract tangled info from block-data and
@@ -123,9 +122,22 @@
            (kill-buffer external))))
 
 
-;; (defun perform-magit (internal external)
-;;   "It is pointless to call this on every block.
-;;    Let the user do it at the end.")
+(add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
+
+(defun test-ctrl-c-hook ()
+  (let* ((cbuff (current-buffer))
+         (mark (org-src-do-at-code-block))
+         (mbuff (marker-buffer mark))
+         (mpos (marker-position mark)))
+    (with-current-buffer mbuff
+      (goto-char mpos)
+      (let* ((tname (get-tangledfile (org-babel-get-src-block-info)))
+             (fbuff (get-filedata-buffer tname)))
+        (with-current-buffer cbuff
+          (erase-buffer)
+          (insert-buffer fbuff)
+          (kill-buffer fbuff))))))
+
 
 (defun perform-custom (internal external)
   "Calls the custom user function if not nil"
@@ -141,17 +153,17 @@
   "Overwrites the current code block"
   (with-current-buffer
       (let ((cut-beg nil) (cut-end nil))
-        (progn (org-babel-goto-src-block-head)
-               (search-forward "\n")
-               (setq cut-beg (point))
-               (search-forward-regexp org-babel-src-name-regexp)
-               (goto-char (- (line-beginning-position) 1))
-               (setq cut-end (point))
-               ;; cut out the old text
-               (delete-region cut-beg cut-end)
-               ;; insert the new text
-               (goto-char cut-beg)
-               (insert-buffer external)))))
+        (org-babel-goto-src-block-head)
+        (search-forward "\n")
+        (setq cut-beg (point))
+        (search-forward-regexp org-babel-src-name-regexp)
+        (goto-char (- (line-beginning-position) 1))
+        (setq cut-end (point))
+        ;; cut out the old text
+        (delete-region cut-beg cut-end)
+        ;; insert the new text
+        (goto-char cut-beg)
+        (insert-buffer external))))
 
 (defun perform-userask-overwrite (internal external)
   "Asks user to overwrite, otherwise skips"
