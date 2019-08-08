@@ -32,7 +32,6 @@
   "A user passed function for action on the internal and external
    buffer. Only takes effect when :custom is set")
 
-
 (defun get-blockbody-buffer (block-info)
   "Extract the body of the code block to compare
    with the external file later"
@@ -121,22 +120,30 @@
            (kill-buffer internal)
            (kill-buffer external))))
 
-
 (add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
 
+(defun test-goto-block ()
+    (with-current-buffer "conf.org"
+      (org-babel-next-src-block 21)))
+
 (defun test-ctrl-c-hook ()
-  (let* ((cbuff (current-buffer))
-         (mark (org-src-do-at-code-block))
-         (mbuff (marker-buffer mark))
-         (mpos (marker-position mark)))
-    (with-current-buffer mbuff
-      (goto-char mpos)
-      (let* ((tname (get-tangledfile (org-babel-get-src-block-info)))
-             (fbuff (get-filedata-buffer tname)))
-        (with-current-buffer cbuff
-          (erase-buffer)
-          (insert-buffer fbuff)
-          (kill-buffer fbuff))))))
+  ;; Get parent pointer
+  (let* ((mark (org-src-do-at-code-block))
+         (org-buffer (marker-buffer mark))
+         (org-position (marker-position mark))
+         (edit-buffer (current-buffer)))
+    (with-current-buffer org-buffer
+      (goto-char org-position)
+      (let* ((tangle-fname (get-tangledfile (org-babel-get-src-block-info)))
+             (file-buffer (get-filedata-buffer tangle-fname)))
+        (when (has-diff edit-buffer org-buffer)
+          (when (y-or-n-p "Change detected, load external? ")
+            (with-current-buffer edit-buffer
+              (erase-buffer)
+              (insert-buffer file-buffer)
+              ;; It makes the right changes, but is unable
+              ;; to close the buffer with the changes
+              (kill-buffer file-buffer))))))))
 
 
 (defun perform-custom (internal external)
