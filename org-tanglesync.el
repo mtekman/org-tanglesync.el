@@ -96,35 +96,39 @@
   (org-babel-goto-src-block-head)
   (let* ((block-info (org-babel-get-src-block-info))
          (tfile (get-tangledfile block-info)))
-    (unless tfile
+    (when tfile
       (let ((buffer-external (get-filedata-buffer tfile))
             (buffer-internal (get-blockbody-buffer block-info)))
         (when (has-diff buffer-internal buffer-external)
-          (perform-action buffer-internal buffer-external))))))
+          (perform-action buffer-internal buffer-external
+                          (get-diffaction block-info)))))))
 
-(defun perform-action (internal external)
+(defun perform-action (internal external action-block)
   "Handle the diffs found between INTERNAL and EXTERNAL
-   using either action specified in header or falling back
-   to default package action"
-  (let ((action-block (get-diffaction))
-        (action-final diff-action)
-        (method-final nil))
-    (when action-block
-      (setq action-final action-block))
-    (cond
-     ((eq action-block :prompt) (setq method-final 'perform-userask-overwrite))
-     ((eq action-block :external (setq method-final 'perform-overwrite)))
-     ((eq action-block :diff (setq method-final 'perform-diff)))
-     ((eq action-block :custom (setq method-final 'perform-custom))))
-    (progn (method-final internal external)
-           (kill-buffer internal)
-           (kill-buffer external))))
+   using either action specified in the ACTION-BLOCK header
+    or falling back to default package action"
+  (let ((do-action diff-action)) ;; default action from package
+    (when action-block           ;; though, if header has action use that
+      (setq do-action action-block))
+    ;; At this point, the action is known. Just need to set the method
+    (let ((method-do nil))
+      (cond
+       ((eq do-action :prompt) (fset 'method-do 'perform-userask-overwrite))
+       ((eq do-action :external) (fset 'method-do 'perform-overwrite))
+       ((eq do-action :diff) (fset 'method-do 'perform-diff))
+       ((eq do-action :custom) (fset 'method-do 'perform-custom)))
+      (progn (method-do internal external)
+             (kill-buffer internal)
+             (kill-buffer external)))))
 
 (add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
 
 (defun test-goto-block ()
     (with-current-buffer "conf.org"
       (org-babel-next-src-block 21)))
+
+(defcustom skip-user-check t
+  "Just pull changes from external if different")
 
 (defun test-ctrl-c-hook ()
   ;; Get parent pointer
@@ -137,14 +141,21 @@
       (let* ((tangle-fname (get-tangledfile (org-babel-get-src-block-info)))
              (file-buffer (get-filedata-buffer tangle-fname)))
         (when (has-diff edit-buffer org-buffer)
-          (when (y-or-n-p "Change detected, load external? ")
-            (with-current-buffer edit-buffer
-              (erase-buffer)
-              (insert-buffer file-buffer)
-              ;; It makes the right changes, but is unable
-              ;; to close the buffer with the changes
-              (kill-buffer file-buffer))))))))
-
+          (let ((pullchanges nil))
+            (cond
+             (skip-user-check
+              (progn
+                (setq pullchanges t)
+                (message "Changes were detected and external loaded.")))
+             ((y-or-n-p "Change detected, load external? ")
+              (setq pullchanges t)))
+            (when pullchanges
+              (with-current-buffer edit-buffer
+                (erase-buffer)
+                (insert-buffer file-buffer)
+                ;; It makes the right changes, but is unable
+                ;; to close the buffer with the changes
+                (kill-buffer file-buffer)))))))))
 
 (defun perform-custom (internal external)
   "Calls the custom user function if not nil"
@@ -158,19 +169,22 @@
 
 (defun perform-overwrite (internal external)
   "Overwrites the current code block"
-  (with-current-buffer
-      (let ((cut-beg nil) (cut-end nil))
-        (org-babel-goto-src-block-head)
-        (search-forward "\n")
-        (setq cut-beg (point))
-        (search-forward-regexp org-babel-src-name-regexp)
-        (goto-char (- (line-beginning-position) 1))
-        (setq cut-end (point))
-        ;; cut out the old text
-        (delete-region cut-beg cut-end)
-        ;; insert the new text
-        (goto-char cut-beg)
-        (insert-buffer external))))
+  (with-current-buffer internal
+    (let* ((mark (org-src-do-at-code-block))
+           (org-buffer (marker-buffer mark)))
+      (with-current-buffer org-buffer
+        (let ((cut-beg nil) (cut-end nil))
+          (org-babel-goto-src-block-head)
+          (search-forward "\n")
+          (setq cut-beg (point))
+          (search-forward-regexp org-babel-src-name-regexp)
+          (goto-char (- (line-beginning-position) 1))
+          (setq cut-end (point))
+          ;; cut out the old text
+          (delete-region cut-beg cut-end)
+          ;; insert the new text
+          (goto-char cut-beg)
+          (insert-buffer external))))))
 
 (defun perform-userask-overwrite (internal external)
   "Asks user to overwrite, otherwise skips"
