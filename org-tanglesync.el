@@ -91,19 +91,21 @@
              (setq point2 (point))
              (string-trim (buffer-substring-no-properties point1 point2))))))
 
+
 (defun process-current-block ()
   "Performs necessary actions on the block under cursor"
   (org-babel-goto-src-block-head)
-  (let* ((block-info (org-babel-get-src-block-info))
+  (let* ((org-buffer (current-buffer))
+         (block-info (org-babel-get-src-block-info))
          (tfile (get-tangledfile block-info)))
     (when tfile
       (let ((buffer-external (get-filedata-buffer tfile))
             (buffer-internal (get-blockbody-buffer block-info)))
         (when (has-diff buffer-internal buffer-external)
-          (perform-action buffer-internal buffer-external
+          (perform-action buffer-internal buffer-external org-buffer
                           (get-diffaction block-info)))))))
 
-(defun perform-action (internal external action-block)
+(defun perform-action (internal external org-buffer action-block)
   "Handle the diffs found between INTERNAL and EXTERNAL
    using either action specified in the ACTION-BLOCK header
     or falling back to default package action"
@@ -117,7 +119,7 @@
        ((eq do-action :external) (fset 'method-do 'perform-overwrite))
        ((eq do-action :diff) (fset 'method-do 'perform-diff))
        ((eq do-action :custom) (fset 'method-do 'perform-custom)))
-      (progn (method-do internal external)
+      (progn (method-do internal external org-buffer)
              (kill-buffer internal)
              (kill-buffer external)))))
 
@@ -127,7 +129,7 @@
     (with-current-buffer "conf.org"
       (org-babel-next-src-block 21)))
 
-(defcustom skip-user-check t
+(defcustom skip-user-check nil
   "Just pull changes from external if different")
 
 (defun test-ctrl-c-hook ()
@@ -142,54 +144,45 @@
              (file-buffer (get-filedata-buffer tangle-fname)))
         (when (has-diff edit-buffer org-buffer)
           (let ((pullchanges nil))
-            (cond
-             (skip-user-check
-              (progn
-                (setq pullchanges t)
-                (message "Changes were detected and external loaded.")))
-             ((y-or-n-p "Change detected, load external? ")
-              (setq pullchanges t)))
+            (cond (skip-user-check
+                   (progn (setq pullchanges t)
+                          (message "Changes were detected and external loaded.")))
+                  ((y-or-n-p "Change detected, load external? ") (setq pullchanges t)))
             (when pullchanges
               (with-current-buffer edit-buffer
-                (erase-buffer)
-                (insert-buffer file-buffer)
-                ;; It makes the right changes, but is unable
-                ;; to close the buffer with the changes
-                (kill-buffer file-buffer)))))))))
+                (progn (erase-buffer)
+                       (insert-buffer file-buffer)
+                       (kill-buffer file-buffer))))))))))
 
-(defun perform-custom (internal external)
+(defun perform-custom (internal external org-buffer)
   "Calls the custom user function if not nil"
   (unless custom-diff-action
-    (custom-diff-action internal external)))
+    (custom-diff-action internal external org-buffer)))
 
-
-(defun perform-diff (internal external)
-  "Literally calls diff"
+(defun perform-diff (internal external org-buffer)
+  "Literally calls diff on INTERNAL and EXTERNAL"
   (diff internal external))
 
-(defun perform-overwrite (internal external)
+(defun perform-overwrite (internal external org-buffer)
   "Overwrites the current code block"
-  (with-current-buffer internal
-    (let* ((mark (org-src-do-at-code-block))
-           (org-buffer (marker-buffer mark)))
-      (with-current-buffer org-buffer
-        (let ((cut-beg nil) (cut-end nil))
-          (org-babel-goto-src-block-head)
-          (search-forward "\n")
-          (setq cut-beg (point))
-          (search-forward-regexp org-babel-src-name-regexp)
-          (goto-char (- (line-beginning-position) 1))
-          (setq cut-end (point))
-          ;; cut out the old text
-          (delete-region cut-beg cut-end)
-          ;; insert the new text
-          (goto-char cut-beg)
-          (insert-buffer external))))))
+  (let ((cut-beg nil) (cut-end nil))
+    (with-current-buffer org-buffer
+      (org-babel-goto-src-block-head)
+      (search-forward "\n")
+      (setq cut-beg (point))
+      (search-forward "#+END_SRC")
+      (goto-char (- (line-beginning-position) 1))
+      (setq cut-end (point))
+      ;; cut out the old text
+      (delete-region cut-beg cut-end)
+      ;; insert the new text
+      (goto-char cut-beg)
+      (insert-buffer external))))
 
-(defun perform-userask-overwrite (internal external)
+(defun perform-userask-overwrite (internal external org-buffer)
   "Asks user to overwrite, otherwise skips"
   (when (y-or-n-p "Block has changed externally. Pull changes? ")
-    (perform-overwrite internal external)))
+    (perform-overwrite internal external org-buffer)))
 
 
 (defun action-on-src-edit ()
