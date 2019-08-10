@@ -123,37 +123,6 @@
              (kill-buffer internal)
              (kill-buffer external)))))
 
-(add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
-
-(defun test-goto-block ()
-    (with-current-buffer "conf.org"
-      (org-babel-next-src-block 21)))
-
-(defcustom skip-user-check nil
-  "Just pull changes from external if different")
-
-(defun test-ctrl-c-hook ()
-  ;; Get parent pointer
-  (let* ((mark (org-src-do-at-code-block))
-         (org-buffer (marker-buffer mark))
-         (org-position (marker-position mark))
-         (edit-buffer (current-buffer)))
-    (with-current-buffer org-buffer
-      (goto-char org-position)
-      (let* ((tangle-fname (get-tangledfile (org-babel-get-src-block-info)))
-             (file-buffer (get-filedata-buffer tangle-fname)))
-        (when (has-diff edit-buffer org-buffer)
-          (let ((pullchanges nil))
-            (cond (skip-user-check
-                   (progn (setq pullchanges t)
-                          (message "Changes were detected and external loaded.")))
-                  ((y-or-n-p "Change detected, load external? ") (setq pullchanges t)))
-            (when pullchanges
-              (with-current-buffer edit-buffer
-                (progn (erase-buffer)
-                       (insert-buffer file-buffer)
-                       (kill-buffer file-buffer))))))))))
-
 (defun perform-custom (internal external org-buffer)
   "Calls the custom user function if not nil"
   (unless custom-diff-action
@@ -167,6 +136,7 @@
   "Overwrites the current code block"
   (let ((cut-beg nil) (cut-end nil))
     (with-current-buffer org-buffer
+      ;;(goto-char org-src--beg-marker) only works from within edit-buffer
       (org-babel-goto-src-block-head)
       (search-forward "\n")
       (setq cut-beg (point))
@@ -187,3 +157,36 @@
 
 (defun action-on-src-edit ()
   "This hooks into the org-babel-edit-src hook")
+
+
+;; tests
+
+(defun test-goto-block ()
+    (with-current-buffer "conf.org"
+      (org-babel-next-src-block 21)))
+
+(defcustom skip-user-check nil
+  "Just pull changes from external if different")
+
+(defun test-ctrl-c-hook ()
+  ;; Get parent pointer
+  (let* ((edit-buffer (current-buffer))
+         (org-buffer (org-src-source-buffer))
+         (org-position org-src--beg-marker))
+    (with-current-buffer org-buffer
+      (goto-char org-position)
+      (let* ((tangle-fname (get-tangledfile (org-babel-get-src-block-info)))
+             (file-buffer (get-filedata-buffer tangle-fname)))
+        (when (has-diff edit-buffer file-buffer)
+          (let ((pullchanges nil))
+            (cond (skip-user-check
+                   (progn (setq pullchanges t)
+                          (message "Changes were detected and external loaded.")))
+                  ((y-or-n-p "Change detected, load external? ") (setq pullchanges t)))
+            (when pullchanges
+              (with-current-buffer edit-buffer
+                (progn (erase-buffer)
+                       (insert-buffer file-buffer)
+                       (kill-buffer file-buffer))))))))))
+
+(add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
