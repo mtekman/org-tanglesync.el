@@ -37,6 +37,7 @@
    with the external file later"
   (let ((buff (get-buffer-create "*block-info*")))
     (with-current-buffer buff
+      (erase-buffer)
       (insert (car (cdr block-info))))
     buff))
 
@@ -61,13 +62,9 @@
   "Pulls the latest content from external file into a temp buffer"
   (let ((buff (get-buffer-create "*filedata*")))
     (with-current-buffer buff
+      (erase-buffer)
       (insert-file-contents file))
     buff))
-
-(defun domain-getallsrcblocks ()
-  ;;(while
-  (org-babel-next-src-block)
-  (process-current-block))
 
 (defun has-diff (internal external)
   (let ((bname (get-buffer-create "*Diff-file-against-block*"))
@@ -91,6 +88,25 @@
              (setq point2 (point))
              (string-trim (buffer-substring-no-properties point1 point2))))))
 
+
+(defun process-entire-buffer (ask-always)
+  (let ((user-ask-state skip-user-check))
+    ;; Set the current global
+    (setq skip-user-check ask-always) 
+    (while (org-babel-next-src-block)
+      (unless skip-user-check
+        (recenter))
+      (process-current-block))
+    ;; Restore global
+    (setq skip-user-check user-ask-state)))
+
+(defun process-entire-buffer-interactive ()
+  "Interactively processes each src block"
+  (process-entire-buffer t))
+
+(defun process-entire-buffer-automatic ()
+  "Process each src block without prompt"
+  (process-entire-buffer nil))
 
 (defun process-current-block ()
   "Performs necessary actions on the block under cursor"
@@ -147,7 +163,16 @@
       (delete-region cut-beg cut-end)
       ;; insert the new text
       (goto-char cut-beg)
-      (insert-buffer external))))
+      (insert-buffer external)
+      ;; Perform the auto indent without prompt
+      (auto-format-block))))
+
+(defun auto-format-block ()
+  "Format a src block no questions asked"
+  (let ((skip-user-check t))
+    (progn (org-edit-src-code)
+           (org-edit-src-exit))))
+
 
 (defun perform-userask-overwrite (internal external org-buffer)
   "Asks user to overwrite, otherwise skips"
