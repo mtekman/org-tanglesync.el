@@ -155,21 +155,11 @@
     (perform-overwrite internal external org-buffer)))
 
 
-(defun action-on-src-edit ()
-  "This hooks into the org-babel-edit-src hook")
-
-
-;; tests
-
-(defun test-goto-block ()
-    (with-current-buffer "conf.org"
-      (org-babel-next-src-block 21)))
-
 (defcustom skip-user-check nil
   "Just pull changes from external if different")
 
-(defun test-ctrl-c-hook ()
-  ;; Get parent pointer
+(defun user-edit-buffer ()
+  "This hooks into the org src mode"
   (let* ((edit-buffer (current-buffer))
          (org-buffer (org-src-source-buffer))
          (org-position org-src--beg-marker))
@@ -186,7 +176,14 @@
             (when pullchanges
               (with-current-buffer edit-buffer
                 (progn (erase-buffer)
-                       (insert-buffer file-buffer)
-                       (kill-buffer file-buffer))))))))))
+                       (insert-buffer file-buffer))))))
+        (kill-buffer file-buffer)))))
 
-(add-hook 'org-src-mode-hook 'test-ctrl-c-hook)
+(add-hook 'org-src-mode-hook 'user-edit-buffer)
+
+;; tests
+
+(defun test-goto-block ()
+    (with-current-buffer "conf.org"
+      (org-babel-next-src-block 21)))
+
