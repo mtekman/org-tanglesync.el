@@ -23,12 +23,12 @@
     (:diff . "diff")          ;; performs a diff between two buffers
     (:custom . "custom")))    ;; performs a user action between buffers
 
-(defcustom diff-action :prompt
+(defcustom default-diff-action :prompt
   "Which default action to perform when a diff is detected between
    an internal block and the external file it is tangled to.
    This is overridden by the ':diff <action>' header on the block.")
 
-(defcustom custom-diff-action nil
+(defcustom perform-custom-diff-action nil
   "A user passed function for action on the internal and external
    buffer. Only takes effect when :custom is set")
 
@@ -38,8 +38,9 @@
   (let ((buff (get-buffer-create "*block-info*")))
     (with-current-buffer buff
       (erase-buffer)
-      (insert (car (cdr block-info))))
-    buff))
+      (insert (car (cdr block-info)))
+      (insert "\n")
+    buff)))
 
 (defun get-header-property (keyw block-info)
   "Extract a specific keyword property from a header"
@@ -88,28 +89,27 @@
              (setq point2 (point))
              (string-trim (buffer-substring-no-properties point1 point2))))))
 
-
-(defun process-entire-buffer (ask-always)
-  (let ((user-ask-state skip-user-check))
-    ;; Set the current global
-    (setq skip-user-check ask-always) 
+(defun process-entire-buffer (dont-ask-user)
+  (let ((count 0))
     (while (org-babel-next-src-block)
-      (unless skip-user-check
+      (unless dont-ask-user
         (recenter))
-      (process-current-block))
-    ;; Restore global
-    (setq skip-user-check user-ask-state)))
+      (let ((res (process-current-block dont-ask-user)))
+        (when res
+          (setq count (+ count 1)))))
+    (minibuffer-message "Processed %d blocks " count)))
 
 (defun process-entire-buffer-interactive ()
   "Interactively processes each src block"
-  (process-entire-buffer t))
+  (process-entire-buffer nil))
 
 (defun process-entire-buffer-automatic ()
   "Process each src block without prompt"
-  (process-entire-buffer nil))
+  (process-entire-buffer t))
 
-(defun process-current-block ()
-  "Performs necessary actions on the block under cursor"
+(defun process-current-block (dont-ask-user)
+  "Performs necessary actions on the block under cursor
+   and prompts user if ASK-USER set to true"
   (org-babel-goto-src-block-head)
   (let* ((org-buffer (current-buffer))
          (block-info (org-babel-get-src-block-info))
@@ -118,31 +118,43 @@
       (let ((buffer-external (get-filedata-buffer tfile))
             (buffer-internal (get-blockbody-buffer block-info)))
         (when (has-diff buffer-internal buffer-external)
-          (perform-action buffer-internal buffer-external org-buffer
-                          (get-diffaction block-info)))))))
+          (let* ((block-action (get-diffaction block-info))
+                 (res-action (resolve-action dont-ask-user block-action)))
+            (perform-action buffer-internal buffer-external org-buffer res-action)))))))
 
-(defun perform-action (internal external org-buffer action-block)
+
+(defun resolve-action (dont-ask-user block-action)
+  "Takes into account user ask preferences and block action and
+   returns an action"
+  (let ((do-action default-diff-action)
+        (method-do nil))
+    ;; default action is overridden by block action
+    (when block-action
+      (setq do-action block-action))
+    (cond
+     (dont-ask-user (fset 'method-do 'perform-overwrite))
+     ((eq do-action :external) (fset 'method-do 'perform-overwrite))
+     ((eq do-action :custom) (fset 'method-do 'perform-custom))
+     ((eq do-action :diff) (fset 'method-do 'perform-diff))
+     ((eq do-action :prompt) (fset 'method-do 'perform-userask-overwrite)))
+    'method-do))
+
+
+(defun perform-action (internal external org-buffer method-do)
   "Handle the diffs found between INTERNAL and EXTERNAL
    using either action specified in the ACTION-BLOCK header
     or falling back to default package action"
-  (let ((do-action diff-action)) ;; default action from package
-    (when action-block           ;; though, if header has action use that
-      (setq do-action action-block))
-    ;; At this point, the action is known. Just need to set the method
-    (let ((method-do nil))
-      (cond
-       ((eq do-action :prompt) (fset 'method-do 'perform-userask-overwrite))
-       ((eq do-action :external) (fset 'method-do 'perform-overwrite))
-       ((eq do-action :diff) (fset 'method-do 'perform-diff))
-       ((eq do-action :custom) (fset 'method-do 'perform-custom)))
-      (progn (method-do internal external org-buffer)
-             (kill-buffer internal)
-             (kill-buffer external)))))
+  (progn (method-do internal external org-buffer)
+         (kill-buffer internal)
+         (kill-buffer external)))
+
+(defcustom skip-user-check nil
+  "Just pull changes from external if different")
 
 (defun perform-custom (internal external org-buffer)
   "Calls the custom user function if not nil"
-  (unless custom-diff-action
-    (custom-diff-action internal external org-buffer)))
+  (unless perform-custom-diff-action
+    (perform-custom-diff-action internal external org-buffer)))
 
 (defun perform-diff (internal external org-buffer)
   "Literally calls diff on INTERNAL and EXTERNAL"
@@ -165,23 +177,21 @@
       (goto-char cut-beg)
       (insert-buffer external)
       ;; Perform the auto indent without prompt
-      (auto-format-block))))
+      (auto-format-block)))
+  (message "Block updated from external"))
 
 (defun auto-format-block ()
   "Format a src block no questions asked"
-  (let ((skip-user-check t))
-    (progn (org-edit-src-code)
-           (org-edit-src-exit))))
-
+  (let ((tmp-suc skip-user-check))
+    (progn (setq skip-user-check t)
+           (org-edit-src-code)
+           (org-edit-src-exit)
+           (setq skip-user-check tmp-suc))))
 
 (defun perform-userask-overwrite (internal external org-buffer)
   "Asks user to overwrite, otherwise skips"
   (when (y-or-n-p "Block has changed externally. Pull changes? ")
     (perform-overwrite internal external org-buffer)))
-
-
-(defcustom skip-user-check nil
-  "Just pull changes from external if different")
 
 (defun user-edit-buffer ()
   "This hooks into the org src mode"
@@ -193,11 +203,10 @@
       (let* ((tangle-fname (get-tangledfile (org-babel-get-src-block-info)))
              (file-buffer (get-filedata-buffer tangle-fname)))
         (when (has-diff edit-buffer file-buffer)
-          (let ((pullchanges nil))
-            (cond (skip-user-check
-                   (progn (setq pullchanges t)
-                          (message "Changes were detected and external loaded.")))
-                  ((y-or-n-p "Change detected, load external? ") (setq pullchanges t)))
+          (let ((pullchanges
+                 (cond (skip-user-check t)
+                       ((y-or-n-p "Change detected, load external? ") t)
+                       (t nil))))
             (when pullchanges
               (with-current-buffer edit-buffer
                 (progn (erase-buffer)
@@ -211,4 +220,3 @@
 (defun test-goto-block ()
     (with-current-buffer "conf.org"
       (org-babel-next-src-block 21)))
-
