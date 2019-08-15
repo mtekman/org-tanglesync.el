@@ -52,7 +52,8 @@
 (defun get-diffaction (block-info)
   "Extract the diff action if present on the block
    otherwise use the default `diff-action`"
-  (get-header-property :diff block-info))
+  (let ((act (get-header-property :diff block-info)))
+    (intern (concat ":" act))))
 
 (defun get-tangledfile (block-info)
   "Extract tangled info from block-data and
@@ -91,19 +92,31 @@
              (string-trim (buffer-substring-no-properties point1 point2))))))
 
 (defun process-entire-buffer (dont-ask-user)
-  (let ((count 0))
-
+  (let ((modified-lines nil)
+        (tmp-mark (point))
+        (tmp-start (window-start)))
+    ;; mark pos
     (condition-case err-blob
         ;; Protected form
         (while (org-babel-next-src-block )
           (unless dont-ask-user
             (recenter))
-          (let ((res (process-current-block dont-ask-user)))
-            (when res
-              (setq count (+ count 1)))))
+          (let ((modded-line (process-current-block dont-ask-user)))
+            (when modded-line
+              (add-to-list 'modified-lines modded-line))))
       ;; Out of bounds
       (error ;; type of error
-       (message "%d blocks updated" count)))))
+       (message "%d blocks updated" (length modified-lines))
+       (org-overview)
+       ;; Pop and expand the buffers
+       (while modified-lines
+         (let ((lmark (car modified-lines)))
+           (setq modified-lines (cdr modified-lines))
+           (progn (goto-char lmark)
+                  (org-reveal t))))
+       ;; restore initial
+       (progn (goto-char tmp-mark)
+              (set-window-start (selected-window) tmp-start))))))
 
 (defun process-entire-buffer-interactive ()
   "Interactively processes each src block"
@@ -117,12 +130,11 @@
   "Performs necessary actions on the block under cursor
    and prompts user if ASK-USER set to true"
   (org-babel-goto-src-block-head)
-  (let* ((visib (not (invisible-p (point-at-bol))))
-         (org-buffer (current-buffer))
+  (let* ((org-buffer (current-buffer))
+         ;;(visib (not (invisible-p (point-at-bol))))
          (block-info (org-babel-get-src-block-info))
          (tfile (get-tangledfile block-info))
          (res nil))
-    (org-overview)
     (when tfile
       (let ((buffer-external (get-filedata-buffer tfile))
             (buffer-internal (get-blockbody-buffer block-info)))
@@ -131,12 +143,8 @@
           (let* ((block-action (get-diffaction block-info))
                  (res-action (resolve-action dont-ask-user block-action)))
             (perform-action buffer-internal buffer-external org-buffer res-action)
-            (setq res t)))))
-    (org-overview)
-    (when (or res visib)
-      (org-reveal t))
-    res))
-;; method that holds the markers of changed blocks and keeps them expanded
+            (setq res (point))))))
+    res)) ;; Res returns nil or the modified line marker
 
 
 
