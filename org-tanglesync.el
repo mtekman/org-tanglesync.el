@@ -48,6 +48,7 @@
          (kvalue (assoc keyw heads)))
     (cdr kvalue)))
 
+
 (defun get-diffaction (block-info)
   "Extract the diff action if present on the block
    otherwise use the default `diff-action`"
@@ -91,13 +92,18 @@
 
 (defun process-entire-buffer (dont-ask-user)
   (let ((count 0))
-    (while (org-babel-next-src-block)
-      (unless dont-ask-user
-        (recenter))
-      (let ((res (process-current-block dont-ask-user)))
-        (when res
-          (setq count (+ count 1)))))
-    (minibuffer-message "Processed %d blocks " count)))
+
+    (condition-case err-blob
+        ;; Protected form
+        (while (org-babel-next-src-block )
+          (unless dont-ask-user
+            (recenter))
+          (let ((res (process-current-block dont-ask-user)))
+            (when res
+              (setq count (+ count 1)))))
+      ;; Out of bounds
+      (error ;; type of error
+       (message "%d blocks updated" count)))))
 
 (defun process-entire-buffer-interactive ()
   "Interactively processes each src block"
@@ -111,16 +117,28 @@
   "Performs necessary actions on the block under cursor
    and prompts user if ASK-USER set to true"
   (org-babel-goto-src-block-head)
-  (let* ((org-buffer (current-buffer))
+  (let* ((visib (not (invisible-p (point-at-bol))))
+         (org-buffer (current-buffer))
          (block-info (org-babel-get-src-block-info))
-         (tfile (get-tangledfile block-info)))
+         (tfile (get-tangledfile block-info))
+         (res nil))
+    (org-overview)
     (when tfile
       (let ((buffer-external (get-filedata-buffer tfile))
             (buffer-internal (get-blockbody-buffer block-info)))
         (when (has-diff buffer-internal buffer-external)
+          (org-reveal t)
           (let* ((block-action (get-diffaction block-info))
                  (res-action (resolve-action dont-ask-user block-action)))
-            (perform-action buffer-internal buffer-external org-buffer res-action)))))))
+            (perform-action buffer-internal buffer-external org-buffer res-action)
+            (setq res t)))))
+    (org-overview)
+    (when (or res visib)
+      (org-reveal t))
+    res))
+;; method that holds the markers of changed blocks and keeps them expanded
+
+
 
 
 (defun resolve-action (dont-ask-user block-action)
