@@ -19,10 +19,12 @@ The user can bypass this and always pull by setting the `org-tanglesync-skip-use
 
 ## Installation
 
+```lisp
 (use-package org-tanglesync
     :bind
     (( "C-c p i" . org-tanglesync-process-entire-buffer-interactive)
      ( "C-c p a" . org-tanglesync-process-entire-buffer-automatic)))
+```
 
 ## Usage
 
