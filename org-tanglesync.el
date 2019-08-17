@@ -43,17 +43,14 @@
   :prefix "org-tanglesync-"
   :group 'emacs)
 
-(deftype actions-on-diff ()
-  '(:external  ;; always overwrites with external
-    :internal  ;; always keep the internal block
-    :prompt    ;; prompts the user to overwrite
-    :diff      ;; performs a diff between two buffers
-    :custom))  ;; performs a user action between buffers
-
 (defcustom org-tanglesync-default-diff-action :prompt
   "Which default action to perform when a diff is detected between an internal block and the external file it is tangled to.  This is overridden by the ':diff <action>' header on the block."
-  :type 'keyword
-  :options 'actions-on-diff
+  :type 'symbol
+  :options '(:external  ;; always overwrites with external
+             :internal  ;; always keep the internal block
+             :prompt    ;; prompts the user to overwrite
+             :diff      ;; performs a diff between two buffers
+             :custom)   ;; performs a user action between buffers
   :group 'org-tanglesync)
 
 (defcustom org-tanglesync-perform-custom-diff-hook nil
@@ -130,7 +127,7 @@ Only takes effect when :custom is set"
 (defun org-tanglesync-perform-custom (internal external org-buffer)
   "Call the function `org-tanglesync-perform-custom-diff-hook` defined by the user with parameters INTERNAL EXTERNAL and ORG-BUFFER."
   (when org-tanglesync-perform-custom-diff-hook
-    (org-tanglesync-perform-custom-diff-hook internal external org-buffer)))
+    (funcall org-tanglesync-perform-custom-diff-hook internal external org-buffer)))
 
 (defun org-tanglesync-perform-diff (internal external org-buffer)
   "Call diff on INTERNAL and EXTERNAL, ignoring ORG-BUFFER."
@@ -167,7 +164,7 @@ Only takes effect when :custom is set"
 (defun org-tanglesync-perform-userask-overwrite (internal external org-buffer)
   "Asks user whether to overwrite the EXTERNAL file change with the INTERNAL src block into the ORG-BUFFER."
   (when (y-or-n-p "Block has changed externally.  Pull changes? ")
-    (perform-overwrite internal external org-buffer)))
+    (org-tanglesync-perform-overwrite internal external org-buffer)))
 
 (defun org-tanglesync-resolve-action (dont-ask-user block-action)
   "Resolves the action to operate on a block, taking into preferences given by the BLOCK-ACTION header and the DONT-ASK-USER parameter, returning an action."
@@ -177,17 +174,17 @@ Only takes effect when :custom is set"
     (when block-action
       (setq do-action block-action))
     (cond
-     (dont-ask-user (fset 'method-do 'perform-overwrite))
-     ((eq do-action :external) (fset 'method-do 'perform-overwrite))
+     (dont-ask-user (fset 'method-do 'org-tanglesync-perform-overwrite))
+     ((eq do-action :external) (fset 'method-do 'org-tanglesync-perform-overwrite))
      ((eq do-action :internal) (fset 'method-do 'org-tanglesync-perform-nothing))
-     ((eq do-action :custom) (fset 'method-do 'perform-custom))
-     ((eq do-action :diff) (fset 'method-do 'perform-diff))
+     ((eq do-action :custom) (fset 'method-do 'org-tanglesync-perform-custom))
+     ((eq do-action :diff) (fset 'method-do 'org-tanglesync-perform-diff))
      ((eq do-action :prompt) (fset 'method-do 'org-tanglesync-perform-userask-overwrite)))
     'method-do))
 
 (defun org-tanglesync-perform-action (internal external org-buffer method-do)
   "Perform the previously resolved action METHOD-DO on the INTERNAL and EXTERNAL change of the org src block within the ORG-BUFFER."
-  (progn (method-do internal external org-buffer)
+  (progn (funcall method-do internal external org-buffer)
          (kill-buffer internal)
          (kill-buffer external)))
 
@@ -223,7 +220,7 @@ Only takes effect when :custom is set"
             (recenter))
           (let ((modded-line (org-tanglesync-process-current-block dont-ask-user)))
             (when modded-line
-              (add-to-list 'modified-lines modded-line))))
+              (cl-pushnew 'modified-lines modded-line))))
       ;; Out of bounds
       (error ;; type of error
        (message "%d blocks updated" (length modified-lines))
