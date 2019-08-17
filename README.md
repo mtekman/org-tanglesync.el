@@ -1,5 +1,7 @@
 # org-tanglesync
 
+<!-- [![MELPA](http://melpa.org/packages/terminal-toggle-badge.svg)](http://melpa.org/#/org-tanglesync.el) -->
+
 Tangled blocks provide a nice way of exporting code into external files, acting as a fantastic agent to write literate dotfile configs. However, such dotfiles tend to be changed externally, sometimes for the worse and sometimes for the better. In the latter case it would be nice to be able to pull those external changes back into the original org src block it originated from.
 
 Pulling external file changes back into a tangled org-babel src block is surprisingly not already an implemented feature, despite many people wanting this simple request.  This package tries to address that.
