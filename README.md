@@ -1,15 +1,17 @@
 # org-tanglesync
 
-Pulling external file changes to a tangled org-babel src block is surprisingly not an implemented feature.  This package addresses that.
+Tangled blocks provide a nice way of exporting code into external files, acting as a fantastic agent to write literate dotfile configs. However, such dotfiles tend to be changed externally, sometimes for the worse and sometimes for the better. In the latter case it would be nice to be able to pull those external changes back into the original org src block it originated from.
+
+Pulling external file changes back into a tangled org-babel src block is surprisingly not already an implemented feature, despite many people wanting this simple request.  This package tries to address that.
 
 ## Overview 
 
-Any block that has :tangle <fname> will compare the block with that external <fname>.  When a diff is detected, 1 of 4 actions can occur:
-   1. External - <fname> contents will override the block contents
-   2. Internal - block will keep the block contents
-   3. Prompt - The user will be prompted to pull external changes
-   4. Diff - A diff of the <fname> and block contents will be produced
-   5. Custom - A user-defined function will be called instead.
+Any src block that has :tangle <fname> will compare the block with the external <fname> it is tangled to.  When a diff is detected, 1 of 4 actions can occur:
+   1. `external` - The <fname> contents will override the block contents
+   2. `internal` - The block will retain the block contents
+   3. `prompt` - The user will be prompted to pull or reject external changes
+   4. `diff` - A diff of the <fname> and block contents will be produced
+   5. `custom` - A custom user-defined function will be called instead
 
 These 5 options can be set as the default action by changing the `org-tanglesync-default-diff-action` custom parameter.  Otherwise individual block actions can be set in the org src block header e.g. `:diff external` for pulling external changes without prompt into a specific block.
 
@@ -19,7 +21,7 @@ The user can bypass this and always pull by setting the `org-tanglesync-skip-use
 
 ## Installation
 
-```lisp
+```elisp
 (use-package org-tanglesync
     :bind
     (( "C-c p i" . org-tanglesync-process-entire-buffer-interactive)
