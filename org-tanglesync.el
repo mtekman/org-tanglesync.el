@@ -64,6 +64,11 @@ Only takes effect when :custom is set"
   :type 'logical
   :group 'org-tanglesync)
 
+(defcustom org-tanglesync-enable-src-mode-hook t
+  "Enable the hook to check for external changes to a block."
+  :type 'logical
+  :group 'org-tanglesync)
+
 (defun org-tanglesync-get-blockbody-buffer (block-info)
   "Extract the body of the code block from BLOCK-INFO to compare with the external file later."
   (let ((buff (get-buffer-create "*block-info*")))
@@ -264,23 +269,24 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-user-edit-buffer ()
   "A hook to the org-src-code mode.  If there is an external change, prompt the user unless the `org-tanglesync-skip-user-check` custom parameter is set."
-  (let* ((edit-buffer (current-buffer))
-         (org-buffer (org-src-source-buffer))
-         (org-position org-src--beg-marker))
-    (with-current-buffer org-buffer
-      (goto-char org-position)
-      (let* ((tangle-fname (org-tanglesync-get-tangledfile (org-babel-get-src-block-info)))
-             (file-buffer (org-tanglesync-get-filedata-buffer tangle-fname)))
-        (when (org-tanglesync-has-diff edit-buffer file-buffer)
-          (let ((pullchanges
-                 (cond (org-tanglesync-skip-user-check t)
-                       ((y-or-n-p "Change detected, load external? ") t)
-                       (t nil))))
-            (when pullchanges
-              (with-current-buffer edit-buffer
-                (erase-buffer)
-                (insert-buffer-substring file-buffer)))))
-        (kill-buffer file-buffer)))))
+  (when org-tanglesync-enable-src-mode-hook
+    (let* ((edit-buffer (current-buffer))
+           (org-buffer (org-src-source-buffer))
+           (org-position org-src--beg-marker))
+      (with-current-buffer org-buffer
+        (goto-char org-position)
+        (let* ((tangle-fname (org-tanglesync-get-tangledfile (org-babel-get-src-block-info)))
+               (file-buffer (org-tanglesync-get-filedata-buffer tangle-fname)))
+          (when (org-tanglesync-has-diff edit-buffer file-buffer)
+            (let ((pullchanges
+                   (cond (org-tanglesync-skip-user-check t)
+                         ((y-or-n-p "Change detected, load external? ") t)
+                         (t nil))))
+              (when pullchanges
+                (with-current-buffer edit-buffer
+                  (erase-buffer)
+                  (insert-buffer-substring file-buffer)))))
+          (kill-buffer file-buffer))))))
 
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
 
