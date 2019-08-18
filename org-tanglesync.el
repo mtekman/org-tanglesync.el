@@ -6,7 +6,7 @@
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
 ;; Package-Requires: ((org "9.2.3") (emacs "24.4"))
-;; Version: 0.1
+;; Version: 0.2
 
 ;;; Commentary:
 
@@ -83,7 +83,8 @@ Only takes effect when :custom is set"
 (defun org-tanglesync-get-diffaction (block-info)
   "Extract the diff action if present in BLOCK-INFO otherwise use the default `diff-action`."
   (let ((act (org-tanglesync-get-header-property :diff block-info)))
-    (intern (concat ":" act))))
+    (when act
+      (intern (concat ":" act)))))
 
 (defun org-tanglesync-get-tangledfile (block-info)
   "Extract tangled info from BLOCK-INFO and return either nil or the file."
@@ -131,7 +132,9 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-perform-diff (internal external org-buffer)
   "Call diff on INTERNAL and EXTERNAL, ignoring ORG-BUFFER."
-  (diff internal external))
+  (diff internal external)
+  (when (y-or-n-p "Halt execution, and resolve this diff? ")
+    (user-error "Halting")))
 
 (defun org-tanglesync-auto-format-block ()
   "Format an org src block with the correct indentation, no questions asked."
@@ -184,7 +187,7 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-perform-action (internal external org-buffer method-do)
   "Perform the previously resolved action METHOD-DO on the INTERNAL and EXTERNAL change of the org src block within the ORG-BUFFER."
-  (progn (funcall method-do internal external org-buffer)
+  (progn (method-do internal external org-buffer)
          (kill-buffer internal)
          (kill-buffer external)))
 
@@ -213,27 +216,32 @@ Only takes effect when :custom is set"
         (tmp-mark (point))
         (tmp-start (window-start)))
     ;; mark pos
-    (condition-case nil
+    (condition-case mess
         ;; Protected form
         (while (org-babel-next-src-block )
           (unless dont-ask-user
             (recenter))
           (let ((modded-line (org-tanglesync-process-current-block dont-ask-user)))
             (when modded-line
-              (cl-pushnew 'modified-lines modded-line))))
+              (pushnew modded-line modified-lines))))
       ;; Out of bounds
       (error ;; type of error
-       (message "%d blocks updated" (length modified-lines))
-       (org-overview)
-       ;; Pop and expand the buffers
-       (while modified-lines
-         (let ((lmark (car modified-lines)))
-           (setq modified-lines (cdr modified-lines))
-           (progn (goto-char lmark)
-                  (org-reveal t))))
-       ;; restore initial
-       (progn (goto-char tmp-mark)
-              (set-window-start (selected-window) tmp-start))))))
+       (setq tmp mess)
+       (let ((emess (error-message-string mess)))
+         (if (string-match "No further code blocks" emess)
+             (progn (message "%d blocks updated" (length modified-lines))
+                    (org-overview)
+                    ;; Pop and expand the buffers
+                    (while modified-lines
+                      (let ((lmark (car modified-lines)))
+                        (setq modified-lines (cdr modified-lines))
+                        (progn (goto-char lmark)
+                               (org-reveal t))))
+                    ;; restore initial
+                    (progn (goto-char tmp-mark)
+                           (set-window-start (selected-window) tmp-start)))
+           ;; else, propagate other errors
+           (error mess)))))))
 
 ;;;###autoload
 (defun org-tanglesync-process-entire-buffer-interactive ()
