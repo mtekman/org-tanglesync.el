@@ -6,7 +6,7 @@
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
 ;; Package-Requires: ((org "9.2.3") (emacs "24.4"))
-;; Version: 0.2
+;; Version: 0.3
 
 ;;; Commentary:
 
@@ -105,25 +105,26 @@ Only takes effect when :custom is set"
     (save-excursion)
     (let ((point1 nil) (point2 nil)
           (marker "Diff finished"))
-      (progn (search-forward marker)
-             (setq point1 (- (point) (length marker)))
-             (goto-char (line-end-position))
-             (setq point2 (point))
-             (string-trim (buffer-substring-no-properties point1 point2))))))
+      (search-forward marker)
+      (setq point1 (- (point) (length marker)))
+      (goto-char (line-end-position))
+      (setq point2 (point))
+      (string-trim (buffer-substring-no-properties point1 point2)))))
 
 (defun org-tanglesync-has-diff (internal external)
   "Perform a diff between the INTERNAL and EXTERNAL and determine if a difference is present."
   (let ((bname (get-buffer-create "*Diff-file-against-block*"))
         (found-diff nil))
-    (progn (diff-no-select internal external nil t bname)
-           (let ((lastline (org-tanglesync-get-diffline bname)))
-             (setq found-diff (not (string-match "no differences" lastline)))))
-    (let ((buffer-modified-p nil))
-      (kill-buffer bname))
+    (diff-no-select internal external nil t bname)
+    (let ((lastline (org-tanglesync-get-diffline bname)))
+      (setq found-diff (not (string-match "no differences" lastline))))
+    (set-buffer-modified-p nil)
+    (kill-buffer bname)
     found-diff))
 
 (defun org-tanglesync-perform-nothing (internal external org-buffer)
-  "Keep the INTERNAL block in the ORG-BUFFER by ignoring EXTERNAL change.")
+  "Keep the INTERNAL block in the ORG-BUFFER by ignoring EXTERNAL change."
+  (ignore internal external org-buffer))
 
 (defun org-tanglesync-perform-custom (internal external org-buffer)
   "Call the function `org-tanglesync-perform-custom-diff-hook` defined by the user with parameters INTERNAL EXTERNAL and ORG-BUFFER."
@@ -133,19 +134,21 @@ Only takes effect when :custom is set"
 (defun org-tanglesync-perform-diff (internal external org-buffer)
   "Call diff on INTERNAL and EXTERNAL, ignoring ORG-BUFFER."
   (diff internal external)
+  (ignore org-buffer)
   (when (y-or-n-p "Halt execution, and resolve this diff? ")
-    (user-error "Halting")))
+    (signal 'quit nil)))
 
 (defun org-tanglesync-auto-format-block ()
   "Format an org src block with the correct indentation, no questions asked."
   (let ((tmp-suc org-tanglesync-skip-user-check))
-    (progn (setq org-tanglesync-skip-user-check t)
-           (org-edit-src-code)
-           (org-edit-src-exit)
-           (setq org-tanglesync-skip-user-check tmp-suc))))
+    (setq org-tanglesync-skip-user-check t)
+    (org-edit-src-code)
+    (org-edit-src-exit)
+    (setq org-tanglesync-skip-user-check tmp-suc)))
 
 (defun org-tanglesync-perform-overwrite (internal external org-buffer)
-  "Overwrites the current code block (INTERNAL) with EXTERNAL change in the ORG-BUFFER."
+  "Overwrites the current code block INTERNAL with EXTERNAL change in the ORG-BUFFER."
+  (ignore internal)
   (let ((cut-beg nil) (cut-end nil))
     (with-current-buffer org-buffer
       ;;(goto-char org-src--beg-marker) only works from within edit-buffer
@@ -183,13 +186,15 @@ Only takes effect when :custom is set"
      ((eq do-action :custom) (fset 'method-do 'org-tanglesync-perform-custom))
      ((eq do-action :diff) (fset 'method-do 'org-tanglesync-perform-diff))
      ((eq do-action :prompt) (fset 'method-do 'org-tanglesync-perform-userask-overwrite)))
+    (ignore method-do)
     'method-do))
 
 (defun org-tanglesync-perform-action (internal external org-buffer method-do)
   "Perform the previously resolved action METHOD-DO on the INTERNAL and EXTERNAL change of the org src block within the ORG-BUFFER."
-  (progn (method-do internal external org-buffer)
-         (kill-buffer internal)
-         (kill-buffer external)))
+  (method-do internal external org-buffer)
+  (kill-buffer internal)
+  (kill-buffer external)
+  (ignore method-do))
 
 (defun org-tanglesync-process-current-block (dont-ask-user)
   "Process the org src block under cursor, and notify user on each change unless DONT-ASK-USER is set.  A marker to the block is returned if modified, otherwise nil."
@@ -218,7 +223,8 @@ Only takes effect when :custom is set"
     ;; mark pos
     (condition-case mess
         ;; Protected form
-        (while (org-babel-next-src-block )
+        (while (org-babel-next-src-block)
+          (org-overview)
           (unless dont-ask-user
             (recenter))
           (let ((modded-line (org-tanglesync-process-current-block dont-ask-user)))
@@ -226,22 +232,23 @@ Only takes effect when :custom is set"
               (pushnew modded-line modified-lines))))
       ;; Out of bounds
       (error ;; type of error
-       (setq tmp mess)
        (let ((emess (error-message-string mess)))
-         (if (string-match "No further code blocks" emess)
-             (progn (message "%d blocks updated" (length modified-lines))
-                    (org-overview)
-                    ;; Pop and expand the buffers
-                    (while modified-lines
-                      (let ((lmark (car modified-lines)))
-                        (setq modified-lines (cdr modified-lines))
-                        (progn (goto-char lmark)
-                               (org-reveal t))))
-                    ;; restore initial
-                    (progn (goto-char tmp-mark)
-                           (set-window-start (selected-window) tmp-start)))
-           ;; else, propagate other errors
-           (error mess)))))))
+         (if (not(string-match "No further code blocks" emess))
+             ;; Propagate error
+             (error mess)
+           ;; Otherwise Process Buffers
+           (message "%d blocks updated" (length modified-lines))
+           (org-overview)
+           ;; Reverse, then Pop and expand the buffers
+           (setq modified-lines (reverse modified-lines))
+           (while modified-lines
+             (let ((lmark (car modified-lines)))
+               (setq modified-lines (cdr modified-lines))
+               (goto-char lmark)
+               (org-reveal t)))
+           ;; restore initial
+           (goto-char tmp-mark)
+           (set-window-start (selected-window) tmp-start)))))))
 
 ;;;###autoload
 (defun org-tanglesync-process-entire-buffer-interactive ()
@@ -271,11 +278,11 @@ Only takes effect when :custom is set"
                        (t nil))))
             (when pullchanges
               (with-current-buffer edit-buffer
-                (progn (erase-buffer)
-                       (insert-buffer-substring file-buffer))))))
+                (erase-buffer)
+                (insert-buffer-substring file-buffer)))))
         (kill-buffer file-buffer)))))
 
-(add-hook 'org-src-mode-hook 'org-tanglesync-user-edit-buffer)
+(add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
 
 (provide 'org-tanglesync)
 ;;; org-tanglesync.el ends here
