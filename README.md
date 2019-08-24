@@ -6,13 +6,19 @@ Tangled blocks provide a nice way of exporting code into external files, acting 
 
 Pulling external file changes back into a tangled org-babel src block is surprisingly not already an implemented feature, despite many people wanting this simple request.  This package tries to address that.
 
+#### Live Demo
+*Left - process entire buffer, Right - hook on edit buffer*
+
+![screen](https://user-images.githubusercontent.com/20641402/63469413-7335e480-c46a-11e9-8a00-1825676f3b2d.gif)
+
+
 ## Overview 
 
-Any src block that has :tangle <fname> will compare the block with the external <fname> it is tangled to.  When a diff is detected, 1 of 4 actions can occur:
-   1. `external` - The <fname> contents will override the block contents
+Any src block that has `:tangle <fname>` will compare the block with the external `<fname>` it is tangled to.  When a diff is detected, 1 of 5 different actions can occur:
+   1. `external` - The `<fname>` contents will override the block contents
    2. `internal` - The block will retain the block contents
    3. `prompt` - The user will be prompted to pull or reject external changes
-   4. `diff` - A diff of the <fname> and block contents will be produced
+   4. `diff` - A diff of the `<fname>` and block contents will be produced
    5. `custom` - A custom user-defined function will be called instead
 
 These 5 options can be set as the default action by changing the `org-tanglesync-default-diff-action` custom parameter.  Otherwise individual block actions can be set in the org src block header e.g. `:diff external` for pulling external changes without prompt into a specific block.
