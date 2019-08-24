@@ -6,7 +6,7 @@
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
 ;; Package-Requires: ((org "9.2.3") (emacs "24.4"))
-;; Version: 0.3
+;; Version: 0.4
 
 ;;; Commentary:
 
@@ -94,7 +94,10 @@ Only takes effect when :custom is set"
 (defun org-tanglesync-get-tangledfile (block-info)
   "Extract tangled info from BLOCK-INFO and return either nil or the file."
   (let* ((tfile (org-tanglesync-get-header-property :tangle block-info)))
-    (unless (string-equal tfile "no") tfile)))
+    (unless (or (string-equal tfile "no")
+                (string-equal tfile "yes"))
+      tfile)))
+
 
 (defun org-tanglesync-get-filedata-buffer (file)
   "Pull the latest content from external FILE into a temp buffer."
@@ -205,20 +208,26 @@ Only takes effect when :custom is set"
   "Process the org src block under cursor, and notify user on each change unless DONT-ASK-USER is set.  A marker to the block is returned if modified, otherwise nil."
   (org-babel-goto-src-block-head)
   (let* ((org-buffer (current-buffer))
-         ;;(visib (not (invisible-p (point-at-bol))))
          (block-info (org-babel-get-src-block-info))
+         (buffer-internal (org-tanglesync-get-blockbody-buffer block-info))
          (tfile (org-tanglesync-get-tangledfile block-info))
-         (res nil))
+         (no-user-action dont-ask-user)
+         (block-marker nil))
     (when tfile
-      (let ((buffer-external (org-tanglesync-get-filedata-buffer tfile))
-            (buffer-internal (org-tanglesync-get-blockbody-buffer block-info)))
-        (when (org-tanglesync-has-diff buffer-internal buffer-external)
-          (org-reveal t)
-          (let* ((block-action (org-tanglesync-get-diffaction block-info))
-                 (res-action (org-tanglesync-resolve-action dont-ask-user block-action)))
-            (org-tanglesync-perform-action buffer-internal buffer-external org-buffer res-action)
-            (setq res (point))))))
-    res))
+      (if (file-exists-p tfile)
+          (let ((buffer-external (org-tanglesync-get-filedata-buffer tfile)))
+            (when (org-tanglesync-has-diff buffer-internal buffer-external)
+              (org-reveal t)
+              (let* ((block-action (org-tanglesync-get-diffaction block-info))
+                     (res-action (org-tanglesync-resolve-action no-user-action block-action)))
+                (org-tanglesync-perform-action buffer-internal buffer-external org-buffer res-action)
+                (setq block-marker (point)))))
+        ;; Otherwise prompt to copy internal block to file
+        (when (y-or-n-p (format "%s does not yet exist, export this block to file? " tfile))
+          (with-current-buffer buffer-internal
+            (write-file tfile)
+            (setq block-marker (point)))))) ;; copy internal buffer to external
+    block-marker))
 
 (defun org-tanglesync-process-entire-buffer (dont-ask-user)
   "Process all org src blocks within the current buffer, prompting the user for action unless the DONT-ASK-USER parameter is set.  All headers and subheaders are collapsed except those containing newly-modified src blocks."
