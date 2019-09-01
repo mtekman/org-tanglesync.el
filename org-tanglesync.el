@@ -5,8 +5,8 @@
 ;; Author: Mehmet Tekman
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
-;; Package-Requires: ((org "9.2.3") (emacs "24.4"))
-;; Version: 0.4
+;; Package-Requires: ((emacs "24.4"))
+;; Version: 0.5
 
 ;;; Commentary:
 
@@ -37,6 +37,8 @@
 ;;; Code:
 (require 'org)
 (require 'diff)
+(require 'cl-lib)
+(require 'subr-x)
 
 (defgroup org-tanglesync nil
   "Group for setting org-tanglesync options"
@@ -182,20 +184,19 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-resolve-action (dont-ask-user block-action)
   "Resolves the action to operate on a block, taking into preferences given by the BLOCK-ACTION header and the DONT-ASK-USER parameter, returning an action."
-  (let ((do-action org-tanglesync-default-diff-action)
-        (method-do nil))
-    ;; default action is overridden by block action
-    (when block-action
-      (setq do-action block-action))
-    (cond
-     (dont-ask-user (fset 'method-do 'org-tanglesync-perform-overwrite))
-     ((eq do-action :external) (fset 'method-do 'org-tanglesync-perform-overwrite))
-     ((eq do-action :internal) (fset 'method-do 'org-tanglesync-perform-nothing))
-     ((eq do-action :custom) (fset 'method-do 'org-tanglesync-perform-custom))
-     ((eq do-action :diff) (fset 'method-do 'org-tanglesync-perform-diff))
-     ((eq do-action :prompt) (fset 'method-do 'org-tanglesync-perform-userask-overwrite)))
-    (ignore method-do)
-    'method-do))
+  (let ((do-action org-tanglesync-default-diff-action))
+    (cl-flet ((method-do (a b c) (ignore a b c)))
+      ;; default action is overridden by block action
+      (when block-action
+        (setq do-action block-action))
+      (cond
+       (dont-ask-user (fset 'method-do 'org-tanglesync-perform-overwrite))
+       ((eq do-action :external) (fset 'method-do 'org-tanglesync-perform-overwrite))
+       ((eq do-action :internal) (fset 'method-do 'org-tanglesync-perform-nothing))
+       ((eq do-action :custom) (fset 'method-do 'org-tanglesync-perform-custom))
+       ((eq do-action :diff) (fset 'method-do 'org-tanglesync-perform-diff))
+       ((eq do-action :prompt) (fset 'method-do 'org-tanglesync-perform-userask-overwrite)))
+      'method-do)))
 
 (defun org-tanglesync-perform-action (internal external org-buffer method-do)
   "Perform the previously resolved action METHOD-DO on the INTERNAL and EXTERNAL change of the org src block within the ORG-BUFFER."
