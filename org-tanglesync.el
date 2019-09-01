@@ -6,7 +6,7 @@
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
 ;; Package-Requires: ((emacs "24.4"))
-;; Version: 0.5
+;; Version: 0.6
 
 ;;; Commentary:
 
@@ -66,10 +66,19 @@ Only takes effect when :custom is set"
   :type 'logical
   :group 'org-tanglesync)
 
-(defcustom org-tanglesync-enable-src-mode-hook t
-  "Enable the hook to check for external changes to a block."
-  :type 'logical
-  :group 'org-tanglesync)
+(defvar org-tanglesync-minor-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m (kbd "C-c M-i") 'org-tanglesync-process-buffer-interactive)
+    m)
+  "Keymap for function `org-tanglesync-minor-mode'.")
+
+(define-minor-mode org-tanglesync-minor-mode
+  "Mode for syncing tangled org babel headers to their external files."
+  nil
+  " tanglesync"
+  org-tanglesync-minor-mode-map
+  (when org-tanglesync-minor-mode
+    (message "Use C-c M-i to interactively process the buffer.")))
 
 (defun org-tanglesync-get-blockbody-buffer (block-info)
   "Extract the body of the code block from BLOCK-INFO to compare with the external file later."
@@ -200,7 +209,7 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-perform-action (internal external org-buffer method-do)
   "Perform the previously resolved action METHOD-DO on the INTERNAL and EXTERNAL change of the org src block within the ORG-BUFFER."
-  (method-do internal external org-buffer)
+  (funcall method-do internal external org-buffer)
   (kill-buffer internal)
   (kill-buffer external)
   (ignore method-do))
@@ -230,7 +239,7 @@ Only takes effect when :custom is set"
             (setq block-marker (point)))))) ;; copy internal buffer to external
     block-marker))
 
-(defun org-tanglesync-process-entire-buffer (dont-ask-user)
+(defun org-tanglesync-process-buffer (dont-ask-user)
   "Process all org src blocks within the current buffer, prompting the user for action unless the DONT-ASK-USER parameter is set.  All headers and subheaders are collapsed except those containing newly-modified src blocks."
   (let ((modified-lines nil)
         (tmp-mark (point))
@@ -244,7 +253,7 @@ Only takes effect when :custom is set"
             (recenter))
           (let ((modded-line (org-tanglesync-process-current-block dont-ask-user)))
             (when modded-line
-              (pushnew modded-line modified-lines))))
+              (cl-pushnew modded-line modified-lines))))
       ;; Out of bounds
       (error ;; type of error
        (let ((emess (error-message-string mess)))
@@ -266,20 +275,20 @@ Only takes effect when :custom is set"
            (set-window-start (selected-window) tmp-start)))))))
 
 ;;;###autoload
-(defun org-tanglesync-process-entire-buffer-interactive ()
+(defun org-tanglesync-process-buffer-interactive ()
   "Interactively processes each org src block in a buffer."
   (interactive)
-  (org-tanglesync-process-entire-buffer nil))
+  (org-tanglesync-process-buffer nil))
 
 ;;;###autoload
-(defun org-tanglesync-process-entire-buffer-automatic ()
+(defun org-tanglesync-process-buffer-automatic ()
   "Process each org src block in a buffer without prompt."
   (interactive)
-  (org-tanglesync-process-entire-buffer t))
+  (org-tanglesync-process-buffer t))
 
 (defun org-tanglesync-user-edit-buffer ()
   "A hook to the org-src-code mode.  If there is an external change, prompt the user unless the `org-tanglesync-skip-user-check` custom parameter is set."
-  (when org-tanglesync-enable-src-mode-hook
+  (when (bound-and-true-p org-tanglesync-minor-mode)
     (let* ((edit-buffer (current-buffer))
            (org-buffer (org-src-source-buffer))
            (org-position org-src--beg-marker))
