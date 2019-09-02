@@ -31,9 +31,8 @@ The user can bypass this and always pull by setting the `org-tanglesync-skip-use
 
 ```elisp
 (use-package org-tanglesync
-    :bind
-    (( "C-c p i" . org-tanglesync-process-buffer-interactive)
-     ( "C-c p a" . org-tanglesync-process-buffer-automatic)))
+  :hook org-mode
+  :bind (("C-c t" . org-tanglesync-minor-mode)))
 ```
 
 ## Usage
