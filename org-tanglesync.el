@@ -72,12 +72,12 @@ Only takes effect when :custom is set"
     m)
   "Keymap for function `org-tanglesync-minor-mode'.")
 
-(define-minor-mode org-tanglesync-minor-mode
+(define-minor-mode org-tanglesync-mode
   "Mode for syncing tangled org babel headers to their external files."
   nil
   " tanglesync"
   org-tanglesync-minor-mode-map
-  (when org-tanglesync-minor-mode
+  (when org-tanglesync-mode
     (message "Use C-c M-i to interactively process the buffer.")))
 
 (defun org-tanglesync-get-blockbody-buffer (block-info)
@@ -186,10 +186,23 @@ Only takes effect when :custom is set"
       (org-tanglesync-auto-format-block)))
   (message "Block updated from external"))
 
+(defcustom org-tanglesync-highlight-color '(:background "lightblue")
+  "Colour to highlight the header line being tested."
+  :type 'list
+  :group 'org-tanglesync)
+
 (defun org-tanglesync-perform-userask-overwrite (internal external org-buffer)
   "Asks user whether to overwrite the EXTERNAL file change with the INTERNAL src block into the ORG-BUFFER."
+  (let* ((lbeg (line-beginning-position))
+        (lend (line-end-position))
+        (overlay-highlight (make-overlay lbeg lend)))
+    (overlay-put overlay-highlight 'face org-tanglesync-highlight-color)
+    (overlay-put overlay-highlight 'line-highlight-overlay-marker t))
+  (recenter)
   (when (y-or-n-p "Block has changed externally.  Pull changes? ")
-    (org-tanglesync-perform-overwrite internal external org-buffer)))
+    (org-tanglesync-perform-overwrite internal external org-buffer))
+  (remove-overlays (line-beginning-position) (line-end-position)))
+
 
 (defun org-tanglesync-resolve-action (dont-ask-user block-action)
   "Resolves the action to operate on a block, taking into preferences given by the BLOCK-ACTION header and the DONT-ASK-USER parameter, returning an action."
@@ -264,15 +277,18 @@ Only takes effect when :custom is set"
            (message "%d blocks updated" (length modified-lines))
            (org-overview)
            ;; Reverse, then Pop and expand the buffers
-           (setq modified-lines (reverse modified-lines))
-           (while modified-lines
-             (let ((lmark (car modified-lines)))
-               (setq modified-lines (cdr modified-lines))
-               (goto-char lmark)
-               (org-reveal t)))
-           ;; restore initial
-           (goto-char tmp-mark)
-           (set-window-start (selected-window) tmp-start)))))))
+           (when modified-lines
+             (with-current-buffer (current-buffer)
+               (set-buffer-modified-p t))
+             (setq modified-lines (reverse modified-lines))
+             (while modified-lines
+               (let ((lmark (car modified-lines)))
+                 (setq modified-lines (cdr modified-lines))
+                 (goto-char lmark)
+                 (org-reveal t))))
+             ;; restore initial
+             (goto-char tmp-mark)
+             (set-window-start (selected-window) tmp-start)))))))
 
 ;;;###autoload
 (defun org-tanglesync-process-buffer-interactive ()
