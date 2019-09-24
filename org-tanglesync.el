@@ -304,24 +304,31 @@ Only takes effect when :custom is set"
 
 (defun org-tanglesync-user-edit-buffer ()
   "A hook to the org-src-code mode.  If there is an external change, prompt the user unless the `org-tanglesync-skip-user-check` custom parameter is set."
-  (when (bound-and-true-p org-tanglesync-minor-mode)
-    (let* ((edit-buffer (current-buffer))
-           (org-buffer (org-src-source-buffer))
-           (org-position org-src--beg-marker))
-      (with-current-buffer org-buffer
+  (let* ((edit-buffer (current-buffer))
+         (org-buffer (org-src-source-buffer))
+         (org-position org-src--beg-marker))
+    (with-current-buffer org-buffer
+      (when (bound-and-true-p org-tanglesync-mode)
         (goto-char org-position)
-        (let* ((tangle-fname (org-tanglesync-get-tangledfile (org-babel-get-src-block-info)))
-               (file-buffer (org-tanglesync-get-filedata-buffer tangle-fname)))
-          (when (org-tanglesync-has-diff edit-buffer file-buffer)
-            (let ((pullchanges
-                   (cond (org-tanglesync-skip-user-check t)
-                         ((y-or-n-p "Change detected, load external? ") t)
-                         (t nil))))
-              (when pullchanges
-                (with-current-buffer edit-buffer
-                  (erase-buffer)
-                  (insert-buffer-substring file-buffer)))))
-          (kill-buffer file-buffer))))))
+        (let* ((tangle-fname (org-tanglesync-get-tangledfile
+                              (org-babel-get-src-block-info)))
+               (exists (file-exists-p tangle-fname)))
+          (when tangle-fname
+            (if exists
+                (let* ((file-buffer (org-tanglesync-get-filedata-buffer tangle-fname))
+                       (hasdiff (org-tanglesync-has-diff edit-buffer file-buffer)))
+                  (when hasdiff
+                      (let ((pullchanges
+                             (cond (org-tanglesync-skip-user-check t)
+                                   ((y-or-n-p "Change detected, load external? ") t)
+                                   (t nil))))
+                        (when pullchanges
+                          (with-current-buffer edit-buffer
+                            (erase-buffer)
+                            (insert-buffer-substring file-buffer)))))
+                  (kill-buffer file-buffer))
+              ;; File does not exist, prompt user
+              (message "File '%s' does not yet exist, please export it after editing." tangle-fname))))))))
 
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
 
