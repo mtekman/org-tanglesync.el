@@ -311,10 +311,9 @@ Only takes effect when :custom is set"
       (when (bound-and-true-p org-tanglesync-mode)
         (goto-char org-position)
         (let* ((tangle-fname (org-tanglesync-get-tangledfile
-                              (org-babel-get-src-block-info)))
-               (exists (file-exists-p tangle-fname)))
+                              (org-babel-get-src-block-info))))
           (when tangle-fname
-            (if exists
+            (if (file-exists-p tangle-fname)
                 (let* ((file-buffer (org-tanglesync-get-filedata-buffer tangle-fname))
                        (hasdiff (org-tanglesync-has-diff edit-buffer file-buffer)))
                   (when hasdiff
