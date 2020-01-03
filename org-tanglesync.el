@@ -40,11 +40,23 @@
 (require 'cl-lib)
 (require 'subr-x)
 
+
 (defgroup org-tanglesync nil
-  "Group for setting org-tanglesync options"
-  :prefix "org-tanglesync-"
+  "Super group for syncing tangled files, either from the config file, or from the external buffers."
+  :prefix org-tanglesync
   :group 'emacs)
 
+(defgroup watch nil
+  "Group for watching changes in external buffers"
+  :prefix org-tanglesync-watch
+  :group 'org-tanglesync)
+
+(defgroup mode nil
+  "Group for setting org-tanglesync-mode options"
+  :prefix org-tanglesync-mode
+  :group 'org-tanglesync)
+
+;; Mode methods
 (defcustom org-tanglesync-default-diff-action :prompt
   "Which default action to perform when a diff is detected between an internal block and the external file it is tangled to.  This is overridden by the ':diff <action>' header on the block."
   :type 'symbol
@@ -53,18 +65,18 @@
              :prompt    ;; prompts the user to overwrite
              :diff      ;; performs a diff between two buffers
              :custom)   ;; performs a user action between buffers
-  :group 'org-tanglesync)
+  :group 'mode)
 
 (defcustom org-tanglesync-perform-custom-diff-hook nil
   "A user passed function for action on the internal and external buffer.
 Only takes effect when :custom is set"
   :type 'hook
-  :group 'org-tanglesync)
+  :group 'mode)
 
 (defcustom org-tanglesync-skip-user-check nil
   "Pull changes from external file if different when launching org src code mode."
   :type 'logical
-  :group 'org-tanglesync)
+  :group 'mode)
 
 (defvar org-tanglesync-minor-mode-map
   (let ((m (make-sparse-keymap)))
@@ -189,7 +201,7 @@ Only takes effect when :custom is set"
 (defcustom org-tanglesync-highlight-color '(:background "lightblue")
   "Colour to highlight the header line being tested."
   :type 'list
-  :group 'org-tanglesync)
+  :group 'mode)
 
 (defun org-tanglesync-perform-userask-overwrite (internal external org-buffer)
   "Asks user whether to overwrite the EXTERNAL file change with the INTERNAL src block into the ORG-BUFFER."
