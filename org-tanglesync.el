@@ -341,6 +341,51 @@ Only takes effect when :custom is set"
               ;; File does not exist, prompt user
               (message "File '%s' does not yet exist, please export it after editing." tangle-fname))))))))
 
+
+
+;; Watch methods
+(define-minor-mode org-tanglesync-watch-mode
+  "Allow org-tanglesync to watch other buffers and check to see if they need syncing back
+to the original conf file."
+  nil
+  " o-ts-watch"
+  nil
+  (when org-tanglesync-watch-mode
+    (message "Watching buffers")))
+
+(defcustom watch-files nil
+  "A list of pathnames to config files each containing tangled files (hopefully without overlaps!)
+The tangled file names given in these files are watched when `buffers-watch` is enabled, and changes are synced back to the org file on save."
+  :type 'listp
+  :group 'watch)
+
+(defun org-tanglesync-watch-get-tanglesync-fnames (org-filename)
+  "Get tangled file names from an ORG-FILENAME."
+  (with-current-buffer org-filename
+    (condition-case mess
+        ;; Protected form
+        (let (foundtfiles nil)
+          (while (org-babel-next-src-block)
+            (org-babel-goto-src-block-head)
+            (let* ((block-info (org-babel-get-src-block-info))
+                   (tfile (org-tanglesync-get-tangledfile block-info))
+                   ;; the :nowatch in the header stops it from being watched
+                   (nowatch (org-tanglesync-get-header-property :nowatch block-info)))
+              (when (and tfile (file-exists-p tfile))
+                (unless nowatch
+                  (nconc foundtfiles (list tfile))))))
+          foundtfiles))))
+
+(defun org-tanglesync-watch-make-watchlist ()
+  (let (tangle-map nil)
+    (dolist (elem watch-files res)
+      (nconc tangle-map (elem . (org-tanglesync-watch-get-tanglesync-fnames elem))))
+    tangle-map))
+
+
+
+
+
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
 
 (provide 'org-tanglesync)
