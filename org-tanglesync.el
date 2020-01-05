@@ -361,26 +361,49 @@ The tangled file names given in these files are watched when `buffers-watch` is 
 
 (defun org-tanglesync-watch-get-tanglesync-fnames (org-filename)
   "Get tangled file names from an ORG-FILENAME."
-  (with-current-buffer org-filename
-    (condition-case mess
-        ;; Protected form
-        (let (foundtfiles nil)
-          (while (org-babel-next-src-block)
-            (org-babel-goto-src-block-head)
-            (let* ((block-info (org-babel-get-src-block-info))
-                   (tfile (org-tanglesync-get-tangledfile block-info))
-                   ;; the :nowatch in the header stops it from being watched
-                   (nowatch (org-tanglesync-get-header-property :nowatch block-info)))
-              (when (and tfile (file-exists-p tfile))
-                (unless nowatch
-                  (nconc foundtfiles (list tfile))))))
-          foundtfiles))))
+  (let ((buff (find-file-noselect org-filename))
+        (foundtfiles nil))
+    (with-current-buffer buff
+      (condition-case mess
+          (progn
+            (goto-char 0)
+            (while (org-babel-next-src-block)
+              (org-babel-goto-src-block-head)
+              (let* ((block-info (org-babel-get-src-block-info))
+                     (tfile (org-tanglesync-get-tangledfile block-info))
+                     ;; the :nowatch in the header stops it from being watched
+                     (nowatch (org-tanglesync-get-header-property :nowatch block-info)))
+                (when (and tfile (file-exists-p tfile))
+                  (unless nowatch
+                    (push tfile foundtfiles))))))
+        ;; Out of bounds
+        (error ;; type of error
+         (let ((emess (error-message-string mess)))
+           (if (not(string-match "No further code blocks" emess))
+               ;; Propagate error
+               (error mess)
+             ;; Otherwise return
+             foundtfiles)))))))
 
-(defun org-tanglesync-watch-make-watchlist ()
-  (let (tangle-map nil)
-    (dolist (elem watch-files res)
-      (nconc tangle-map (elem . (org-tanglesync-watch-get-tanglesync-fnames elem))))
+
+(defun org-tanglesync-watch-make-watchlist (watchlist)
+  "Generates an association list of conf files given by the WATCHLIST to their tangled files."
+  (let ((tangle-map nil))
+    (dolist (element watchlist tangle-map)
+      (push `(,element . ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
     tangle-map))
+
+(defun org-tanglesync-watch-get-conf-source (tfile confmap)
+  "Find the conf file for a given TFILE tangled file in the CONFMAP. Assumes unique, so returns first match."
+  (let ((foundcfile nil))
+    (while (and confmap (not foundcfile))
+      (let* ((elemmap (car confmap))
+             (cfile (car elemmap))
+             (tfilellist (cdr elemmap)))
+        (if (member tfile tfilellist)
+            (setq foundcfile cfile)
+          (setq confmap (cdr confmap)))))
+    foundcfile))
 
 
 
