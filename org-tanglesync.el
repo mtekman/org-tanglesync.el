@@ -346,7 +346,8 @@ Only takes effect when :custom is set"
 
 
 
-;; Watch methods
+;; ---- Watch methods ----
+
 (define-minor-mode org-tanglesync-watch-mode
   "Allow org-tanglesync to watch other buffers and check to see if they need syncing back
 to the original conf file."
@@ -378,7 +379,7 @@ The tangled file names given in these files are watched when `buffers-watch` is 
                      (nowatch (org-tanglesync-get-header-property :nowatch block-info)))
                 (when (and tfile (file-exists-p tfile))
                   (unless nowatch
-                    (push tfile foundtfiles))))))
+                    (push (expand-file-name tfile) foundtfiles))))))
         ;; Out of bounds
         (error ;; type of error
          (let ((emess (error-message-string mess)))
