@@ -177,11 +177,13 @@ Only takes effect when :custom is set"
     (org-edit-src-exit)
     (setq org-tanglesync-skip-user-check tmp-suc)))
 
-(defun org-tanglesync-perform-overwrite (internal external org-buffer)
+(defun org-tanglesync-perform-overwrite (internal external org-buffer &optional pos)
   "Overwrites the current code block INTERNAL with EXTERNAL change in the ORG-BUFFER."
   (ignore internal)
   (let ((cut-beg nil) (cut-end nil))
     (with-current-buffer org-buffer
+      (when pos
+        (goto-char pos))
       ;;(goto-char org-src--beg-marker) only works from within edit-buffer
       (org-babel-goto-src-block-head)
       (search-forward "\n")
@@ -197,6 +199,7 @@ Only takes effect when :custom is set"
       ;; Perform the auto indent without prompt
       (org-tanglesync-auto-format-block)))
   (message "Block updated from external"))
+
 
 (defcustom org-tanglesync-highlight-color '(:background "lightblue")
   "Colour to highlight the header line being tested."
