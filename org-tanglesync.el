@@ -409,10 +409,62 @@ The tangled file names given in these files are watched when `buffers-watch` is 
           (setq confmap (cdr confmap)))))
     foundcfile))
 
+(defun org-tanglesync-watch-get-tfile-pos (tfile cfile)
+  "Get cursor position of TFILE in the CFILE."
+  (let ((buff (find-file-noselect cfile))
+        (blockpos nil))
+    (with-current-buffer buff
+      (condition-case mess
+          (progn
+            (goto-char 0)
+            (while (and (not blockpos) (org-babel-next-src-block))
+              (org-babel-goto-src-block-head)
+              (let* ((block-info (org-babel-get-src-block-info))
+                     (block-tfile (org-tanglesync-get-tangledfile block-info)))
+                (when (and block-tfile
+                           (string= (expand-file-name block-tfile)
+                                    (expand-file-name tfile)))
+                  ;; Found the block for the specific tfile
+                  ;; - We don't store the positions for each tfile when we
+                  ;;   first build the file map, because positions are likely
+                  ;;   to change often.
+                  (setq blockpos (point)))))
+            blockpos)
+        ;; Out of bounds
+        (error ;; type of error
+         (let ((emess (error-message-string mess)))
+           (if (not(string-match "No further code blocks" emess))
+               ;; Propagate error
+               (error mess)
+             ;; Otherwise return
+             blockpos)))))))
 
+(defun org-tanglesync-watch-sync-tfile-to-conf (tfile confmap)
+  "Sync the TFILE tangle file back to the CONFMAP config file."
+  (let ((cfile (org-tanglesync-get-conf-source tfile confmap)))
+    (if cfile ;; Perform sync
+        (org-tanglesync-watch-perform-sync tfile cfile)
+      (message "Could not find config file for %s." tfile))))
 
+(defun org-tanglesync-watch-perform-sync (tfile cfile contents)
+  "Take CONTENTS from TFILE and place them into the CFILE config."
+  (let ((cbuff (find-file-noselect cfile))
+         (tpos (org-tanglesync-watch-get-tfile-pos tfile cfile)))
+    (org-tanglesync-perform-overwrite t contents cbuff tpos)
+    (message "Synced %s to %s" tfile cfile)))
 
+(defun org-tanglesync-watch-save ()
+  "A hook to take the current contents of the saved file and sync them
+back to source conf file they are originally tangled to."
+  (when (and watch-files org-tanglesync-watch-mode)
+    (let ((tfile buffer-file-name)
+          (confmap (org-tanglesync-watch-make-watchlist watch-files))
+          (contents (org-tanglesync-get-filedata-buffer buffer-file-name)))
+      (let ((cfile (org-tanglesync-watch-get-conf-source tfile confmap)))
+        (when cfile
+          (org-tanglesync-watch-perform-sync tfile cfile contents))))))
 
+(add-hook 'after-save-hook #'org-tanglesync-watch-save)
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
 
 (provide 'org-tanglesync)
