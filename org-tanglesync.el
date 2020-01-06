@@ -394,7 +394,7 @@ The tangled file names given in these files are watched when `buffers-watch` is 
   "Generates an association list of conf files given by the WATCHLIST to their tangled files."
   (let ((tangle-map nil))
     (dolist (element watchlist tangle-map)
-      (push `(,element . ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
+      (push `(,element ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
     tangle-map))
 
 (defun org-tanglesync-watch-get-conf-source (tfile confmap)
@@ -403,7 +403,7 @@ The tangled file names given in these files are watched when `buffers-watch` is 
     (while (and confmap (not foundcfile))
       (let* ((elemmap (car confmap))
              (cfile (car elemmap))
-             (tfilellist (cdr elemmap)))
+             (tfilellist (car (cdr elemmap))))
         (if (member tfile tfilellist)
             (setq foundcfile cfile)
           (setq confmap (cdr confmap)))))
