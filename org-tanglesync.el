@@ -6,16 +6,17 @@
 ;; URL: https://github.com/mtekman/org-tanglesync.el
 ;; Keywords: outlines
 ;; Package-Requires: ((emacs "24.4"))
-;; Version: 0.6
+;; Version: 1.1
 
 ;;; Commentary:
 
 ;; Pulling external file changes to a tangled org-babel src block
-;; is surprisingly not an implemented feature.  This addresses that.
+;; is surprisingly not a well-implemented feature.  This addresses that.
 ;;
 ;; Any block that has :tangle <fname> will compare the block with
 ;; that external <fname>.  When a diff is detected, 1 of 4 actions
 ;; can occur:
+;;
 ;;   1. External - <fname> contents will override the block contents
 ;;   2. Internal - block will keep the block contents
 ;;   3. Prompt - The user will be prompted to pull external changes
@@ -33,13 +34,21 @@
 ;; want to pull external changes if a difference is detected.
 ;; The user can bypass this and always pull by setting the
 ;; `org-tanglesync-skip-user-check` custom parameter.
+;;
+;; Since v1.1, a "watch" mode has been added that does not require you
+;; to be within the org buffer to sync changes to the tangled blocks,
+;; but can now instead modify directly from the external tangled buffer
+;; and the changes will be synced back to the org file in the background.
+;; The `org-tanglesync-watch-files` needs only to be set a list of org
+;; files with tangled blocks, and `org-tanglesync-watch-mode` needs to
+;; enabled globally.
+
 
 ;;; Code:
 (require 'org)
 (require 'diff)
 (require 'cl-lib)
 (require 'subr-x)
-
 
 (defgroup org-tanglesync nil
   "Super group for syncing tangled files, either from the config file, or from the external buffers."
@@ -178,7 +187,7 @@ Only takes effect when :custom is set"
     (setq org-tanglesync-skip-user-check tmp-suc)))
 
 (defun org-tanglesync-perform-overwrite (internal external org-buffer &optional pos)
-  "Overwrites the current code block INTERNAL with EXTERNAL change in the ORG-BUFFER."
+  "Overwrites the current code block INTERNAL with EXTERNAL change in the ORG-BUFFER at optional position POS."
   (ignore internal)
   (let ((cut-beg nil) (cut-end nil))
     (with-current-buffer org-buffer
@@ -357,9 +366,12 @@ to the original conf file."
   (when org-tanglesync-watch-mode
     (message "Watching buffers")))
 
-(defcustom watch-files nil
-  "A list of pathnames to config files each containing tangled files (hopefully without overlaps!)
-The tangled file names given in these files are watched when `buffers-watch` is enabled, and changes are synced back to the org file on save."
+(defcustom org-tanglesync-watch-files nil
+  "A list of pathnames to config files.
+Each pathname contains a list of tangled files (though hopefully without
+overlaps!) The tangled file names given in these files are watched when
+`org-tanglesync-watch-mode` is enabled, and changes are synced back to
+the org file on save."
   :type 'listp
   :group 'watch)
 
@@ -391,14 +403,14 @@ The tangled file names given in these files are watched when `buffers-watch` is 
 
 
 (defun org-tanglesync-watch-make-watchlist (watchlist)
-  "Generates an association list of conf files given by the WATCHLIST to their tangled files."
+  "Generate an association list of conf files given by the WATCHLIST to their tangled files."
   (let ((tangle-map nil))
     (dolist (element watchlist tangle-map)
       (push `(,element ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
     tangle-map))
 
 (defun org-tanglesync-watch-get-conf-source (tfile confmap)
-  "Find the conf file for a given TFILE tangled file in the CONFMAP. Assumes unique, so returns first match."
+  "Find the conf file for a given TFILE tangled file in the CONFMAP.  Assumes unique, so return first match."
   (let ((foundcfile nil))
     (while (and confmap (not foundcfile))
       (let* ((elemmap (car confmap))
@@ -454,8 +466,9 @@ The tangled file names given in these files are watched when `buffers-watch` is 
     (message "Synced %s to %s" tfile cfile)))
 
 (defun org-tanglesync-watch-save ()
-  "A hook to take the current contents of the saved file and sync them
-back to source conf file they are originally tangled to."
+  "A hook to update current buffer contents in the source org file.
+Takes the current contents of the saved file and sync them back to
+the source org file they are originally tangled to."
   (when (and watch-files org-tanglesync-watch-mode)
     (let ((tfile buffer-file-name)
           (confmap (org-tanglesync-watch-make-watchlist watch-files))
