@@ -4,14 +4,23 @@
 
 Tangled blocks provide a nice way of exporting code into external files, acting as a fantastic agent to write literate dotfile configs. However, such dotfiles tend to be changed externally, sometimes for the worse and sometimes for the better. In the latter case it would be nice to be able to pull those external changes back into the original org src block it originated from.
 
+## Overview
 
-#### Live Demo
+This package offers two complementary methods for syncing changes between a tangled block and the source org file it is tangled from: [Pull Changes From Org Buffer](#pull-changes-from-org-buffer), and [Push Changes From External Tangled File](#push-changes-from-external-tangled-file).
+
+Both methods are illustrated with example of an org file `"mydotfiles.conf"` which contains literate dotfile configurations for various user config files, of which one of them is `~/.xinitrc` as given by the block starting with `+begin_src bash :tangle ~/.xinitrc`.
+
+### Pull Changes From Org Buffer
+
 *Left - process entire buffer, Right - hook on edit buffer*
 
 ![screen](https://user-images.githubusercontent.com/20641402/63469413-7335e480-c46a-11e9-8a00-1825676f3b2d.gif)
 
+This is the use-case where you have opened `mydotfiles.org` containing - among many other tangled source blocks - a block with `:tangle ~/.xinitrc` as a header. You wish to sync changes either by exporting that block to the `~/.xinitrc` file, or by pulling the changes you have made externally to that file back into the block within your `mydotfiles.org`.
 
-## Overview 
+The above actions can be performed either globally or at the individual block level depending on your configuration.
+
+#### Configuration
 
 Any src block that has `:tangle <fname>` will compare the block with the external `<fname>` it is tangled to.  When a diff is detected, 1 of 5 different actions can occur:
    1. `prompt` - (*default*) The user will be prompted to pull or reject external changes
@@ -22,15 +31,42 @@ Any src block that has `:tangle <fname>` will compare the block with the externa
 
 These 5 options can be set as the default action by changing the `org-tanglesync-default-diff-action` custom parameter.  Otherwise individual block actions can be set in the org src block header e.g. `:diff external` for pulling external changes without prompt into a specific block. The default action is to simply prompt the user.
 
-This package also provides a hook when the org src block is being edited (e.g. via `C-c '`) which asks the user if they want to pull external changes if a difference is detected.
+#### Execution
 
-The user can bypass this and always pull by setting the `org-tanglesync-skip-user-check` custom parameter.
+The user can either call `org-tanglesync-process-buffer-interactive` or `org-tanglesync-process-buffer-automatic` to interactively/automatically process all tangled blocks in the org buffer. This will go through each tangled block from top to bottom, pausing to prompt the user for an action if one has not been defined in its header.
+
+If the user wishes to sync only a single block, a much easier way is to simply edit the block in the org-src mode (activated via `C-c '`). This executes a hook which prompts the user for an action on that specific block if a difference is detected. The user can bypass this and always pull changes by setting the `org-tanglesync-skip-user-check` custom parameter.
+
+### Push Changes From External Tangled File
+
+**(i.e. "watch" mode)**
+
+This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `mydotfiles.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `mydotfiles.org` to sync). This is often the much more preferred use-case for many.
+
+#### Configuration
+
+The user needs to only set the `org-tanglesync-watch-files` to a list of org files which have tangled blocks that need to be 'watched', and enable `org-tanglesync-watch-mode` globally.
+
+e.g. `(setq org-tanglesync-watch-files '("mydotfiles.org" "someotherdotfile.org"))` `
+
+
+#### Execution
+
+Since `mydotfiles.org` contains the block `~/.xinitrc`, whenever `~/.xinitrc` is modified and saved within emacs, the changes are automatically synced back to `mydotfiles.org`.
+
+i.e. The user only needs to perform a save on `~/.xinitrc`
+
+By default, all tangled blocks specified in `org-tanglesync-watch-files` are watched and updated upon saving, however this can be overridden at the individual block level by adding `:nowatch` to the header.
+
 
 ## Installation
 
 ```elisp
 (use-package org-tanglesync
-    :hook (org-mode . org-tanglesync-mode)
+    :hook ((org-mode . org-tanglesync-mode)
+           (org-mode . org-tanglesync-watch-mode))
+    :custom
+    (org-tanglesync-watch-files '("literateconfig.org"))
     :bind
     (( "C-c M-i" . org-tanglesync-process-buffer-interactive))
      ( "C-c M-a" . org-tanglesync-process-buffer-automatic))
@@ -42,9 +78,4 @@ The whole org file can be parsed using one of the two commands above, performing
 
 Otherwise the changes can act at an individual block label whenever the user enters the org-src-edit-code mode via the default `C-c '` binding.
 
-## Comments
-
-A good literate dotfile config should ideally make use of `:comments link` and `:tangle-mode (identity #o444)` in the block headers (or the top global header via `#+PROPERTY:   header-args+ :tangle-mode (identity #o444)`) to ensure that the tangled file is not writable, and that it provides links back to the source file that the user can follow.
-
-However the above - though being the correct method to maintain robust configs - is not faster or more preferable than editing the file directly to see the effects immediately. This package enables the external file changes to be pulled back into the org buffer the next time it is open.
-
+When watch mode is activated, the user only needs to specify a list of org files to watch, and can use emacs normally with the knowledge that tangled files are synced automatically back to the correct org file.
