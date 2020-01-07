@@ -469,9 +469,9 @@ the org file on save."
   "A hook to update current buffer contents in the source org file.
 Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
-  (when (and watch-files org-tanglesync-watch-mode)
+  (when (and org-tanglesync-watch-files org-tanglesync-watch-mode)
     (let ((tfile buffer-file-name)
-          (confmap (org-tanglesync-watch-make-watchlist watch-files))
+          (confmap (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files))
           (contents (org-tanglesync-get-filedata-buffer buffer-file-name)))
       (let ((cfile (org-tanglesync-watch-get-conf-source tfile confmap)))
         (when cfile
