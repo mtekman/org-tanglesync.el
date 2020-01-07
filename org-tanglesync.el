@@ -52,20 +52,9 @@
 
 (defgroup org-tanglesync nil
   "Super group for syncing tangled files, either from the config file, or from the external buffers."
-  :prefix org-tanglesync
   :group 'emacs)
 
-(defgroup watch nil
-  "Group for watching changes in external buffers"
-  :prefix org-tanglesync-watch
-  :group 'org-tanglesync)
-
-(defgroup mode nil
-  "Group for setting org-tanglesync-mode options"
-  :prefix org-tanglesync-mode
-  :group 'org-tanglesync)
-
-;; Mode methods
+;; ---- Mode methods ----
 (defcustom org-tanglesync-default-diff-action :prompt
   "Which default action to perform when a diff is detected between an internal block and the external file it is tangled to.  This is overridden by the ':diff <action>' header on the block."
   :type 'symbol
@@ -74,18 +63,18 @@
              :prompt    ;; prompts the user to overwrite
              :diff      ;; performs a diff between two buffers
              :custom)   ;; performs a user action between buffers
-  :group 'mode)
+  :group 'org-tanglesync)
 
 (defcustom org-tanglesync-perform-custom-diff-hook nil
   "A user passed function for action on the internal and external buffer.
 Only takes effect when :custom is set"
   :type 'hook
-  :group 'mode)
+  :group 'org-tanglesync)
 
 (defcustom org-tanglesync-skip-user-check nil
   "Pull changes from external file if different when launching org src code mode."
   :type 'logical
-  :group 'mode)
+  :group 'org-tanglesync)
 
 (defvar org-tanglesync-minor-mode-map
   (let ((m (make-sparse-keymap)))
@@ -213,7 +202,7 @@ Only takes effect when :custom is set"
 (defcustom org-tanglesync-highlight-color '(:background "lightblue")
   "Colour to highlight the header line being tested."
   :type 'list
-  :group 'mode)
+  :group 'org-tanglesync)
 
 (defun org-tanglesync-perform-userask-overwrite (internal external org-buffer)
   "Asks user whether to overwrite the EXTERNAL file change with the INTERNAL src block into the ORG-BUFFER."
@@ -354,9 +343,7 @@ Only takes effect when :custom is set"
               (message "File '%s' does not yet exist, please export it after editing." tangle-fname))))))))
 
 
-
 ;; ---- Watch methods ----
-
 (define-minor-mode org-tanglesync-watch-mode
   "Allow org-tanglesync to watch other buffers and check to see if they need syncing back
 to the original conf file."
@@ -373,7 +360,7 @@ overlaps!) The tangled file names given in these files are watched when
 `org-tanglesync-watch-mode` is enabled, and changes are synced back to
 the org file on save."
   :type 'listp
-  :group 'watch)
+  :group 'org-tanglesync)
 
 (defun org-tanglesync-watch-get-tanglesync-fnames (org-filename)
   "Get tangled file names from an ORG-FILENAME."
@@ -401,13 +388,17 @@ the org file on save."
              ;; Otherwise return
              foundtfiles)))))))
 
-
 (defun org-tanglesync-watch-make-watchlist (watchlist)
   "Generate an association list of conf files given by the WATCHLIST to their tangled files."
   (let ((tangle-map nil))
     (dolist (element watchlist tangle-map)
       (push `(,element ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
     tangle-map))
+
+(defvar confmap
+  (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files)
+  "An alist that points a config file to all containing tangled filenames.
+Uses `org-tanglesync-watch-files` to generate.")
 
 (defun org-tanglesync-watch-get-conf-source (tfile confmap)
   "Find the conf file for a given TFILE tangled file in the CONFMAP.  Assumes unique, so return first match."
@@ -471,11 +462,14 @@ Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
   (when (and org-tanglesync-watch-files org-tanglesync-watch-mode)
     (let ((tfile buffer-file-name)
-          (confmap (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files))
-          (contents (org-tanglesync-get-filedata-buffer buffer-file-name)))
+          ;;(confmap (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files))
+          ;; -- this should already be initialised, though the issue is
+          ;;    when do we update it?
+          (contbuff (org-tanglesync-get-filedata-buffer buffer-file-name)))
       (let ((cfile (org-tanglesync-watch-get-conf-source tfile confmap)))
         (when cfile
-          (org-tanglesync-watch-perform-sync tfile cfile contents))))))
+          (org-tanglesync-watch-perform-sync tfile cfile contbuff)
+          (kill-buffer contbuff))))))
 
 (add-hook 'after-save-hook #'org-tanglesync-watch-save)
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
