@@ -18,7 +18,7 @@ Both methods are illustrated with example of an org file `"mydotfiles.conf"` whi
     :hook ((org-mode . org-tanglesync-mode)
            (org-mode . org-tanglesync-watch-mode))
     :custom
-    (org-tanglesync-watch-files '("literateconfig.org"))
+    (org-tanglesync-watch-files '("conf.org" "otherconf.org"))
     :bind
     (( "C-c M-i" . org-tanglesync-process-buffer-interactive)
      ( "C-c M-a" . org-tanglesync-process-buffer-automatic)))
@@ -43,18 +43,18 @@ When watch mode is activated, the user only needs to specify a list of org files
 
 ![screen2](https://user-images.githubusercontent.com/20641402/71929804-b59e5a80-319a-11ea-83d5-20f4343f08ea.gif)
 
-This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `mydotfiles.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `mydotfiles.org` to sync). This is often the much more preferred use-case for many.
+This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `conf.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `conf.org` to sync). This is often the much more preferred use-case for many.
 
 #### Configuration
 
 The user needs to only set the `org-tanglesync-watch-files` to a list of org files which have tangled blocks that need to be 'watched', and enable `org-tanglesync-watch-mode` globally.
 
-e.g. `(setq org-tanglesync-watch-files '("mydotfiles.org" "someotherdotfile.org"))` `
+e.g. `(setq org-tanglesync-watch-files '("conf.org" "someotherdotfile.org"))` `
 
 
 #### Execution
 
-Since `mydotfiles.org` contains the block `~/.xinitrc`, whenever `~/.xinitrc` is modified and saved within emacs, the changes are automatically synced back to `mydotfiles.org`.
+Since `conf.org` contains the block `~/.xinitrc`, whenever `~/.xinitrc` is modified and saved within emacs, the changes are automatically synced back to `conf.org`.
 
 i.e. The user only needs to perform a save on `~/.xinitrc`
 
@@ -67,7 +67,7 @@ By default, all tangled blocks specified in `org-tanglesync-watch-files` are wat
 
 ![screen](https://user-images.githubusercontent.com/20641402/63469413-7335e480-c46a-11e9-8a00-1825676f3b2d.gif)
 
-This is the use-case where you have opened `mydotfiles.org` containing - among many other tangled source blocks - a block with `:tangle ~/.xinitrc` as a header. You wish to sync changes either by exporting that block to the `~/.xinitrc` file, or by pulling the changes you have made externally to that file back into the block within your `mydotfiles.org`.
+This is the use-case where you have opened `conf.org` containing - among many other tangled source blocks - a block with `:tangle ~/.xinitrc` as a header. You wish to sync changes either by exporting that block to the `~/.xinitrc` file, or by pulling the changes you have made externally to that file back into the block within your `conf.org`.
 
 The above actions can be performed either globally or at the individual block level depending on your configuration.
 
