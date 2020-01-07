@@ -6,9 +6,60 @@ Tangled blocks provide a nice way of exporting code into external files, acting 
 
 ## Overview
 
-This package offers two complementary methods for syncing changes between a tangled block and the source org file it is tangled from: [Pull Changes From Org Buffer](#pull-changes-from-org-buffer), and [Push Changes From External Tangled File](#push-changes-from-external-tangled-file).
+This package offers two complementary methods for syncing changes between a tangled block and the source org file it is tangled from: [Push Changes From External Tangled File](#push-changes-from-external-tangled-file), and [Pull Changes From Org Buffer](#pull-changes-from-org-buffer).
 
 Both methods are illustrated with example of an org file `"mydotfiles.conf"` which contains literate dotfile configurations for various user config files, of which one of them is `~/.xinitrc` as given by the block starting with `+begin_src bash :tangle ~/.xinitrc`.
+
+
+## Installation
+
+```elisp
+(use-package org-tanglesync
+    :hook ((org-mode . org-tanglesync-mode)
+           (org-mode . org-tanglesync-watch-mode))
+    :custom
+    (org-tanglesync-watch-files '("literateconfig.org"))
+    :bind
+    (( "C-c M-i" . org-tanglesync-process-buffer-interactive)
+     ( "C-c M-a" . org-tanglesync-process-buffer-automatic)))
+```
+
+## Usage
+
+The whole org file can be parsed using one of the two commands above, performing actions on any org src block with a tangle property. If the block also has a `:diff` property then the action associated with that diff will be used (see above).
+
+Otherwise the changes can act at an individual block label whenever the user enters the org-src-edit-code mode via the default `C-c '` binding.
+
+When watch mode is activated, the user only needs to specify a list of org files to watch, and can use emacs normally with the knowledge that tangled files are synced automatically back to the correct org file.
+
+
+## Syncing Modes
+
+### Push Changes From External Tangled File
+
+**(i.e. "watch" mode)**
+
+*Left - the org buffer with the tangled file, Right - the external .xinitrc file*
+
+![screen2](https://user-images.githubusercontent.com/20641402/71929804-b59e5a80-319a-11ea-83d5-20f4343f08ea.gif)
+
+This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `mydotfiles.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `mydotfiles.org` to sync). This is often the much more preferred use-case for many.
+
+#### Configuration
+
+The user needs to only set the `org-tanglesync-watch-files` to a list of org files which have tangled blocks that need to be 'watched', and enable `org-tanglesync-watch-mode` globally.
+
+e.g. `(setq org-tanglesync-watch-files '("mydotfiles.org" "someotherdotfile.org"))` `
+
+
+#### Execution
+
+Since `mydotfiles.org` contains the block `~/.xinitrc`, whenever `~/.xinitrc` is modified and saved within emacs, the changes are automatically synced back to `mydotfiles.org`.
+
+i.e. The user only needs to perform a save on `~/.xinitrc`
+
+By default, all tangled blocks specified in `org-tanglesync-watch-files` are watched and updated upon saving, however this can be overridden at the individual block level by adding `:nowatch` to the header.
+
 
 ### Pull Changes From Org Buffer
 
@@ -37,45 +88,3 @@ The user can either call `org-tanglesync-process-buffer-interactive` or `org-tan
 
 If the user wishes to sync only a single block, a much easier way is to simply edit the block in the org-src mode (activated via `C-c '`). This executes a hook which prompts the user for an action on that specific block if a difference is detected. The user can bypass this and always pull changes by setting the `org-tanglesync-skip-user-check` custom parameter.
 
-### Push Changes From External Tangled File
-
-**(i.e. "watch" mode)**
-
-This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `mydotfiles.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `mydotfiles.org` to sync). This is often the much more preferred use-case for many.
-
-#### Configuration
-
-The user needs to only set the `org-tanglesync-watch-files` to a list of org files which have tangled blocks that need to be 'watched', and enable `org-tanglesync-watch-mode` globally.
-
-e.g. `(setq org-tanglesync-watch-files '("mydotfiles.org" "someotherdotfile.org"))` `
-
-
-#### Execution
-
-Since `mydotfiles.org` contains the block `~/.xinitrc`, whenever `~/.xinitrc` is modified and saved within emacs, the changes are automatically synced back to `mydotfiles.org`.
-
-i.e. The user only needs to perform a save on `~/.xinitrc`
-
-By default, all tangled blocks specified in `org-tanglesync-watch-files` are watched and updated upon saving, however this can be overridden at the individual block level by adding `:nowatch` to the header.
-
-
-## Installation
-
-```elisp
-(use-package org-tanglesync
-    :hook ((org-mode . org-tanglesync-mode)
-           (org-mode . org-tanglesync-watch-mode))
-    :custom
-    (org-tanglesync-watch-files '("literateconfig.org"))
-    :bind
-    (( "C-c M-i" . org-tanglesync-process-buffer-interactive))
-     ( "C-c M-a" . org-tanglesync-process-buffer-automatic))
-```
-
-## Usage
-
-The whole org file can be parsed using one of the two commands above, performing actions on any org src block with a tangle property. If the block also has a `:diff` property then the action associated with that diff will be used (see above).
-
-Otherwise the changes can act at an individual block label whenever the user enters the org-src-edit-code mode via the default `C-c '` binding.
-
-When watch mode is activated, the user only needs to specify a list of org files to watch, and can use emacs normally with the knowledge that tangled files are synced automatically back to the correct org file.
