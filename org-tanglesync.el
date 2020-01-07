@@ -395,7 +395,7 @@ the org file on save."
       (push `(,element ,(org-tanglesync-watch-get-tanglesync-fnames element)) tangle-map))
     tangle-map))
 
-(defvar confmap
+(defvar org-tanglesync-confmap
   (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files)
   "An alist that points a config file to all containing tangled filenames.
 Uses `org-tanglesync-watch-files` to generate.")
@@ -462,11 +462,15 @@ Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
   (when (and org-tanglesync-watch-files org-tanglesync-watch-mode)
     (let ((tfile buffer-file-name)
-          ;;(confmap (org-tanglesync-watch-make-watchlist org-tanglesync-watch-files))
+          ;;(org-tanglesync-confmap
+          ;; (org-tanglesync-watch-make-watchlist
+          ;;  org-tanglesync-watch-files))
           ;; -- this should already be initialised, though the issue is
           ;;    when do we update it?
           (contbuff (org-tanglesync-get-filedata-buffer buffer-file-name)))
-      (let ((cfile (org-tanglesync-watch-get-conf-source tfile confmap)))
+      (let ((cfile (org-tanglesync-watch-get-conf-source
+                    tfile
+                    org-tanglesync-confmap)))
         (when cfile
           (org-tanglesync-watch-perform-sync tfile cfile contbuff)
           (kill-buffer contbuff))))))
