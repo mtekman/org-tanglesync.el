@@ -14,7 +14,7 @@
 ;; is surprisingly not a well-implemented feature.  This addresses that.
 ;;
 ;; Any block that has :tangle <fname> will compare the block with
-;; that external <fname>.  When a diff is detected, 1 of 4 actions
+;; that external <fname>.  When a diff is detected, 1 of 5 actions
 ;; can occur:
 ;;
 ;;   1. External - <fname> contents will override the block contents

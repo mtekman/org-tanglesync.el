@@ -27,9 +27,9 @@ Both methods are illustrated with example of an org file `"mydotfiles.conf"` whi
 
 ## Usage
 
-The whole org file can be parsed using one of the two commands above, performing actions on any org src block with a tangle property. If the block also has a `:diff` property then the action associated with that diff will be used (see above).
+The whole org file can be parsed using one of the two commands above, performing actions on any org src block with a tangle property. If the block also has a `:diff` property then the action associated with that diff will be used, such as. `:diff internal`, `:diff diff`, etc. (see [actions below](#configuration-1)).
 
-Otherwise the changes can act at an individual block label whenever the user enters the org-src-edit-code mode via the default `C-c '` binding.
+Otherwise the changes can act at an individual block label whenever the user enters the *org-src-edit-code* mode via the default `C-c '` binding.
 
 When watch mode is activated, the user only needs to specify a list of org files to watch, and can use emacs normally with the knowledge that tangled files are synced automatically back to the correct org file.
 
@@ -74,7 +74,7 @@ The above actions can be performed either globally or at the individual block le
 
 #### Configuration
 
-Any src block that has `:tangle <fname>` will compare the block with the external `<fname>` it is tangled to.  When a diff is detected, 1 of 5 different actions can occur:
+Any src block that has `:tangle <fname>` will compare the block with the external `<fname>` it is tangled to.  When a diff is detected, 1 of 5 different `:diff <action>` actions can occur:
    1. `prompt` - (*default*) The user will be prompted to pull or reject external changes
    1. `external` - The `<fname>` contents will override the block contents
    1. `internal` - The block will retain the block contents
