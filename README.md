@@ -15,13 +15,14 @@ Both methods are illustrated with example of an org file `"mydotfiles.conf"` whi
 
 ```elisp
 (use-package org-tanglesync
-    :hook ((org-mode . org-tanglesync-mode)
-           (org-mode . org-tanglesync-watch-mode))
-    :custom
-    (org-tanglesync-watch-files '("conf.org" "otherconf.org"))
-    :bind
-    (( "C-c M-i" . org-tanglesync-process-buffer-interactive)
-     ( "C-c M-a" . org-tanglesync-process-buffer-automatic)))
+  :hook ((org-mode . org-tanglesync-mode)
+         ;; enable watch-mode globally:
+         ((prog-mode text-mode) . org-tanglesync-watch-mode))
+  :custom
+  (org-tanglesync-watch-files '("conf.org" "myotherconf.org"))
+  :bind
+  (( "C-c M-i" . org-tanglesync-process-buffer-interactive)
+   ( "C-c M-a" . org-tanglesync-process-buffer-automatic)))
 ```
 
 ## Usage
