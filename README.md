@@ -28,7 +28,7 @@ This package offers two complementary methods for syncing changes between a tang
 
 ## From External File, Push to Tangled Block
 
-![screen2](https://user-images.githubusercontent.com/20641402/72068928-6107f600-32e6-11ea-88e7-29bf43a32faf.gif)  
+![screen2](https://user-images.githubusercontent.com/20641402/72112550-2d58ba80-333e-11ea-9616-1d9d5e7df947.gif)  
 *Left - the org buffer with the tangled file, Right - the external .xinitrc file*
 
 This is the use-case where you have `~/.xinitrc` open and want to automatically sync your changes back to `conf.org` every time you save the `~/.xinitrc` file (i.e. you don't want to open `conf.org` to sync).
