@@ -23,7 +23,7 @@ Tangled blocks provide a nice way of exporting code into external files, acting 
 This package offers two complementary methods for syncing changes between a tangled block and the source org file it is tangled from:
 
  1. [From External File, Push to Tangled Block](#from-external-file-push-to-tangled-block)
- 1. [From Org File, Pull External Changes Into Tangled Blocks](#todo)
+ 1. [From Org File, Pull External Changes Into Tangled Blocks](#from-org-file-pull-external-changes-into-tangled-blocks)
  
 
 ## From External File, Push to Tangled Block
@@ -71,7 +71,11 @@ These 5 options can be set as the default action by changing the `org-tanglesync
 
 #### Execution
 
+##### Sync All Tangled Blocks in Buffer
+
 The user can either call `org-tanglesync-process-buffer-interactive` or `org-tanglesync-process-buffer-automatic` to interactively/automatically process all tangled blocks in the org buffer. This will go through each tangled block from top to bottom, pausing to prompt the user for an action if one has not been defined in its header.
+
+##### Sync Just One Block
 
 If the user wishes to sync only a single block, a much easier way is to simply edit the block in the org-src mode (activated via `C-c '`). This executes a hook which prompts the user for an action on that specific block if a difference is detected. The user can bypass this and always pull changes by setting the `org-tanglesync-skip-user-check` custom parameter.
 
