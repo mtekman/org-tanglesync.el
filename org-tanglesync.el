@@ -87,8 +87,11 @@ Only takes effect when :custom is set"
   nil
   " tanglesync"
   org-tanglesync-minor-mode-map
-  (when org-tanglesync-mode
-    (message "Use C-c M-i to interactively process the buffer.")))
+  (if org-tanglesync-mode
+      (progn
+        (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
+        (message "Use C-c M-i to interactively process the buffer."))
+    (remove-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)))
 
 (defun org-tanglesync-get-blockbody-buffer (block-info)
   "Extract the body of the code block from BLOCK-INFO to compare with the external file later."
@@ -350,8 +353,10 @@ to the original conf file."
   nil
   " o-ts-watch"
   nil
-  (when org-tanglesync-watch-mode
-    (message "Watching buffers")))
+  (if org-tanglesync-watch-mode
+      (progn (message "Watching buffers")
+             (add-hook 'after-save-hook #'org-tanglesync-watch-save nil t))
+    (remove-hook 'after-save-hook #'org-tanglesync-watch-save t)))
 
 (defcustom org-tanglesync-watch-files nil
   "A list of pathnames to config files.
@@ -460,17 +465,14 @@ Uses `org-tanglesync-watch-files` to generate.")
   "A hook to update current buffer contents in the source org file.
 Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
-
-(add-hook 'after-save-hook #'org-tanglesync-watch-save)
-(add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
-(when org-tanglesync-watch-files
-  (let* ((tfile buffer-file-name)
-         (cfile (org-tanglesync-watch-get-conf-source
-                 tfile
-                 org-tanglesync-confmap)))
-    (when cfile
-      (org-tanglesync-watch-perform-sync
-       tfile cfile (org-tanglesync-get-filedata-buffer buffer-file-name))))))
+  (when org-tanglesync-watch-files
+    (let* ((tfile buffer-file-name)
+           (cfile (org-tanglesync-watch-get-conf-source
+                   tfile
+                   org-tanglesync-confmap)))
+      (when cfile
+        (org-tanglesync-watch-perform-sync
+         tfile cfile (org-tanglesync-get-filedata-buffer buffer-file-name))))))
 
 (provide 'org-tanglesync)
 ;;; org-tanglesync.el ends here
