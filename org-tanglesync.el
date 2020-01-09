@@ -460,23 +460,17 @@ Uses `org-tanglesync-watch-files` to generate.")
   "A hook to update current buffer contents in the source org file.
 Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
-  (when (and org-tanglesync-watch-files org-tanglesync-watch-mode)
-    (let ((tfile buffer-file-name)
-          ;;(org-tanglesync-confmap
-          ;; (org-tanglesync-watch-make-watchlist
-          ;;  org-tanglesync-watch-files))
-          ;; -- this should already be initialised, though the issue is
-          ;;    when do we update it?
-          (contbuff (org-tanglesync-get-filedata-buffer buffer-file-name)))
-      (let ((cfile (org-tanglesync-watch-get-conf-source
-                    tfile
-                    org-tanglesync-confmap)))
-        (when cfile
-          (org-tanglesync-watch-perform-sync tfile cfile contbuff)
-          (kill-buffer contbuff))))))
 
 (add-hook 'after-save-hook #'org-tanglesync-watch-save)
 (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
+(when org-tanglesync-watch-files
+  (let* ((tfile buffer-file-name)
+         (cfile (org-tanglesync-watch-get-conf-source
+                 tfile
+                 org-tanglesync-confmap)))
+    (when cfile
+      (org-tanglesync-watch-perform-sync
+       tfile cfile (org-tanglesync-get-filedata-buffer buffer-file-name))))))
 
 (provide 'org-tanglesync)
 ;;; org-tanglesync.el ends here
