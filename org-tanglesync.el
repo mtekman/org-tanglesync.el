@@ -87,8 +87,11 @@ Only takes effect when :custom is set"
   nil
   " tanglesync"
   org-tanglesync-minor-mode-map
-  (when org-tanglesync-mode
-    (message "Use C-c M-i to interactively process the buffer.")))
+  (if org-tanglesync-mode
+      (progn
+        (add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
+        (message "Use C-c M-i to interactively process the buffer."))
+    (remove-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)))
 
 (defun org-tanglesync-get-blockbody-buffer (block-info)
   "Extract the body of the code block from BLOCK-INFO to compare with the external file later."
@@ -350,8 +353,10 @@ to the original conf file."
   nil
   " o-ts-watch"
   nil
-  (when org-tanglesync-watch-mode
-    (message "Watching buffers")))
+  (if org-tanglesync-watch-mode
+      (progn (message "Watching buffers")
+             (add-hook 'after-save-hook #'org-tanglesync-watch-save nil t))
+    (remove-hook 'after-save-hook #'org-tanglesync-watch-save t)))
 
 (defcustom org-tanglesync-watch-files nil
   "A list of pathnames to config files.
@@ -449,34 +454,25 @@ Uses `org-tanglesync-watch-files` to generate.")
         (org-tanglesync-watch-perform-sync tfile cfile)
       (message "Could not find config file for %s." tfile))))
 
-(defun org-tanglesync-watch-perform-sync (tfile cfile contents)
-  "Take CONTENTS from TFILE and place them into the CFILE config."
+(defun org-tanglesync-watch-perform-sync (tfile cfile content-buffer)
+  "Take CONTENT-BUFFER from TFILE and place them into the CFILE config."
   (let ((cbuff (find-file-noselect cfile))
          (tpos (org-tanglesync-watch-get-tfile-pos tfile cfile)))
-    (org-tanglesync-perform-overwrite t contents cbuff tpos)
+    (org-tanglesync-perform-overwrite t content-buffer cbuff tpos)
     (message "Synced %s to %s" tfile cfile)))
 
 (defun org-tanglesync-watch-save ()
   "A hook to update current buffer contents in the source org file.
 Takes the current contents of the saved file and sync them back to
 the source org file they are originally tangled to."
-  (when (and org-tanglesync-watch-files org-tanglesync-watch-mode)
-    (let ((tfile buffer-file-name)
-          ;;(org-tanglesync-confmap
-          ;; (org-tanglesync-watch-make-watchlist
-          ;;  org-tanglesync-watch-files))
-          ;; -- this should already be initialised, though the issue is
-          ;;    when do we update it?
-          (contbuff (org-tanglesync-get-filedata-buffer buffer-file-name)))
-      (let ((cfile (org-tanglesync-watch-get-conf-source
-                    tfile
-                    org-tanglesync-confmap)))
-        (when cfile
-          (org-tanglesync-watch-perform-sync tfile cfile contbuff)
-          (kill-buffer contbuff))))))
-
-(add-hook 'after-save-hook #'org-tanglesync-watch-save)
-(add-hook 'org-src-mode-hook #'org-tanglesync-user-edit-buffer)
+  (when org-tanglesync-watch-files
+    (let* ((tfile buffer-file-name)
+           (cfile (org-tanglesync-watch-get-conf-source
+                   tfile
+                   org-tanglesync-confmap)))
+      (when cfile
+        (org-tanglesync-watch-perform-sync
+         tfile cfile (current-buffer))))))
 
 (provide 'org-tanglesync)
 ;;; org-tanglesync.el ends here
