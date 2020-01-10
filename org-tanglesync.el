@@ -454,11 +454,11 @@ Uses `org-tanglesync-watch-files` to generate.")
         (org-tanglesync-watch-perform-sync tfile cfile)
       (message "Could not find config file for %s." tfile))))
 
-(defun org-tanglesync-watch-perform-sync (tfile cfile contents)
-  "Take CONTENTS from TFILE and place them into the CFILE config."
+(defun org-tanglesync-watch-perform-sync (tfile cfile content-buffer)
+  "Take CONTENT-BUFFER from TFILE and place them into the CFILE config."
   (let ((cbuff (find-file-noselect cfile))
          (tpos (org-tanglesync-watch-get-tfile-pos tfile cfile)))
-    (org-tanglesync-perform-overwrite t contents cbuff tpos)
+    (org-tanglesync-perform-overwrite t content-buffer cbuff tpos)
     (message "Synced %s to %s" tfile cfile)))
 
 (defun org-tanglesync-watch-save ()
@@ -472,7 +472,7 @@ the source org file they are originally tangled to."
                    org-tanglesync-confmap)))
       (when cfile
         (org-tanglesync-watch-perform-sync
-         tfile cfile (org-tanglesync-get-filedata-buffer buffer-file-name))))))
+         tfile cfile (current-buffer))))))
 
 (provide 'org-tanglesync)
 ;;; org-tanglesync.el ends here
