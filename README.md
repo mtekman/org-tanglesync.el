@@ -1,3 +1,9 @@
+### This repo has migrated to GitLab
+https://gitlab.com/mtekman/org-tanglesync.el
+###### (The copy here is archived. Please see the above link for the latest developments)
+
+********
+
 # org-tanglesync
 
 [![MELPA](https://melpa.org/packages/org-tanglesync-badge.svg)](https://melpa.org/#/org-tanglesync)
